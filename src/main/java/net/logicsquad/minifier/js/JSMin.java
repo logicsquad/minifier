@@ -5,53 +5,12 @@ import java.io.PushbackReader;
 import java.io.Reader;
 import java.io.Writer;
 
-
-
 /**
  * Pack algorithm for JavaScript
  *
  * @author Daniel Galán y Martins
  * @author John Reilly
  * @author Douglas Crockford
- * @version $Revision: 1.3 $
- *
- * JSMin.java 2006-02-13
- *
- * Updated 2007-08-20 with updates from jsmin.c (2007-05-22)
- * (see here http://sourceforge.net/tracker/index.php?func=detail&aid=1865077&group_id=189328&atid=928887
- * and here http://www.inconspicuous.org/2007/08/21/update-to-jsminjava/)
- *
- * Copyright (c) 2006 John Reilly (www.inconspicuous.org)
- *
- * This work is a translation from C to Java of jsmin.c published by
- * Douglas Crockford.  Permission is hereby granted to use the Java
- * version under the same conditions as the jsmin.c on which it is
- * based.
- *
- *
- * jsmin.c 2003-04-21
- *
- * Copyright (c) 2002 Douglas Crockford (www.crockford.com)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * The Software shall be used for Good, not Evil.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
  */
 public class JSMin {
 

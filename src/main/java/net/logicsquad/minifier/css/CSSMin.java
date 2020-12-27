@@ -5,14 +5,6 @@ package net.logicsquad.minifier.css;
  * It removes unnecessary whitespace and comments, and orders the contents of CSS
  * selectors alphabetically to enhance GZIP compression.
  *
- * Originally by Barry van Oudtshoorn, with bug reports, fixes, and contributions by
- * <ul>
- *   <li>Kevin de Groote</li>
- *   <li>Pedro Pinheiro</li>
- *   <li>Asier Lostalé</li>
- * </ul>
- * Some code is based on the YUI CssCompressor code, by Julien Lecomte.
- *
  * @author Barry van Oudtshoorn
  */
 
