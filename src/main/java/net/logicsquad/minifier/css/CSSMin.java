@@ -22,37 +22,6 @@ public class CSSMin {
 	protected static boolean bDebug = false;
 
 	/**
-	 * Main entry point for CSSMin from the command-line.
-	 * <b>Usage:</b> CSSMin <i>[Input file]</i>, <i>[Output file]</i>, <i>[DEBUG]</i>
-	 * @param args The command-line arguments
-	 */
-	public static void main(String[] args) {
-		if (args.length < 1) {
-			System.out.println("Usage: ");
-			System.out.println("CSSMin [Input file] [Output file] [DEBUG]");
-			System.out.println("If no output file is specified, stdout will be used.");
-			return;
-		}
-		
-		bDebug = (args.length > 2);
-		
-		PrintStream out;
-		
-		if (args.length > 1) {
-			try {
-				out = new PrintStream(args[1]);
-			} catch (Exception e) {
-				System.err.println("Error outputting to " + args[1] + "; redirecting to stdout");
-				out = System.out;
-			}
-		} else {
-			out = System.out;
-		}
-		
-		formatFile(args[0], out);
-	}
-	
-	/**
 	 * Process a file from a filename.
 	 * @param filename The file name of the CSS file to process.
 	 * @param out Where to send the result
