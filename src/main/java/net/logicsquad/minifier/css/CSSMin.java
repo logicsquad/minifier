@@ -1,20 +1,24 @@
 package net.logicsquad.minifier.css;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
 /**
- * CSSMin takes in well-formed, human-readable CSS and reduces its size substantially.
- * It removes unnecessary whitespace and comments, and orders the contents of CSS
- * selectors alphabetically to enhance GZIP compression.
- *
+ * Strips comments and whitespace from CSS input.
+ * 
+ * @author paulh
  * @author Barry van Oudtshoorn
  */
-
-import java.util.*;
-import java.util.regex.*;
-import java.io.*;
-import java.lang.*;
-
 public class CSSMin {
-	
 	protected static boolean bDebug = false;
 
 	/**
