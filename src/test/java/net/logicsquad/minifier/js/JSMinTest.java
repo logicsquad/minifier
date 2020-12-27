@@ -33,14 +33,31 @@ public class JSMinTest {
 	private static final String INPUT_1 = "input/test-1.js";
 
 	/**
+	 * Input
+	 */
+	private static final String INPUT_2 = "input/test-2.js";
+
+	/**
 	 * Expected output
 	 */
 	private static final String OUTPUT_1 = "output/test-1.js";
+
+	/**
+	 * Expected output
+	 */
+	private static final String OUTPUT_2 = "output/test-2.js";
 
 	@Test
 	public void test1() throws IOException, UnterminatedRegExpLiteralException, UnterminatedCommentException,
 			UnterminatedStringLiteralException {
 		assertExpected(OUTPUT_1, INPUT_1);
+		return;
+	}
+
+	@Test
+	public void test2() throws IOException, UnterminatedRegExpLiteralException, UnterminatedCommentException,
+			UnterminatedStringLiteralException {
+		assertExpected(OUTPUT_2, INPUT_2);
 		return;
 	}
 
@@ -62,7 +79,7 @@ public class JSMinTest {
 		JSMin jsmin = new JSMin(reader, writer);
 		jsmin.jsmin();
 		String expected = new String(Files.readAllBytes(Paths.get(RESOURCES_DIR, expectedFile)));
-		assertEquals(expected, writer.toString());
+		assertEquals(expected.trim(), writer.toString().trim());
 		return;
 	}
 }
