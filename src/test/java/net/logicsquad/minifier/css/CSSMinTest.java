@@ -4,73 +4,45 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
+
+import net.logicsquad.minifier.AbstractTest;
 
 /**
  * Unit tests on {@link Minifier} class.
  * 
  * @author paulh
  */
-public class CSSMinTest {
+public class CSSMinTest extends AbstractTest {
 	/**
-	 * Resource directory
+	 * Indexes for input/output resources
 	 */
-	private static final String RESOURCES_DIR = "src/test/resources";
+	private static final List<String> RESOURCES = Arrays.asList("1", "2");
 
 	/**
-	 * Input
+	 * Extension for resource files
 	 */
-	private static final String INPUT_1 = "input/test-1.css";
+	private static final String EXTENSION = "css";
 
-	/**
-	 * Input
-	 */
-	private static final String INPUT_2 = "input/test-2.css";
-
-	/**
-	 * Expected output
-	 */
-	private static final String OUTPUT_1 = "output/test-1.css";
-
-	/**
-	 * Expected output
-	 */
-	private static final String OUTPUT_2 = "output/test-2.css";
-
-	@Test
-	public void test1() throws IOException {
-		assertExpected(OUTPUT_1, INPUT_1);
-		return;
+	@Override
+	protected String extension() {
+		return EXTENSION;
 	}
 
 	@Test
-	public void test2() throws IOException {
-		assertExpected(OUTPUT_2, INPUT_2);
-		return;
-	}
-
-	/**
-	 * Minifies CSS in {@code sourceFile} and compares result to content in
-	 * {@code expectedFile}.
-	 * 
-	 * @param expectedFile filename for expected result
-	 * @param sourceFile   filename for source input
-	 * @throws IOException if any issues loading resources
-	 */
-	private void assertExpected(String expectedFile, String sourceFile) throws IOException {
-		Reader reader = new InputStreamReader(CSSMinTest.class.getClassLoader().getResourceAsStream(sourceFile));
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		CSSMin.formatFile(reader, out);
-		String expected = new String(Files.readAllBytes(Paths.get(RESOURCES_DIR, expectedFile)));
-		String actual = new String(out.toByteArray(), StandardCharsets.UTF_8);
-		// trim() here because there seems to be a difference in line endings
-		assertEquals(expected.trim(), actual.trim());
+	public void actualOutputMatchesExpected() throws IOException {
+		for (String index : RESOURCES) {
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			CSSMin.formatFile(readerForSourceFile(index), out);
+			String expected = stringForExpectedFile(index);
+			String actual = new String(out.toByteArray(), StandardCharsets.UTF_8);
+			// trim() here because there seems to be a difference in line endings
+			assertEquals(expected.trim(), actual.trim());
+		}
 		return;
 	}
 }
