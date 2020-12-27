@@ -1,4 +1,5 @@
 ![](https://github.com/logicsquad/minifier/workflows/build/badge.svg)
+[![License](https://img.shields.io/badge/License-BSD-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
 Minifier
 ========
