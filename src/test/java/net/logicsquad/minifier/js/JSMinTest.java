@@ -24,7 +24,7 @@ public class JSMinTest extends AbstractTest {
 	/**
 	 * Indexes for input/output resources
 	 */
-	private static final List<String> RESOURCES = Arrays.asList("1", "2");
+	private static final List<String> RESOURCES = Arrays.asList("01", "02");
 
 	/**
 	 * Extension for resource files
