@@ -23,7 +23,7 @@ import net.logicsquad.minifier.css.CSSMinTest;
  */
 public abstract class AbstractMinifierTest {
 	/**
-	 * Resource directory
+	 * Resources directory
 	 */
 	private static final String RESOURCES_DIR = "src/test/resources";
 
@@ -58,10 +58,29 @@ public abstract class AbstractMinifierTest {
 		return new String(Files.readAllBytes(Paths.get(RESOURCES_DIR, expectedFile)));
 	}
 
+	/**
+	 * Returns a {@link Minifier} for {@code reader}. Obviously, subclasses should
+	 * return an instance of the {@link Minifier} they are testing.
+	 * 
+	 * @param reader a {@link Reader} supplying source content
+	 * @return {@link Minifier} to test
+	 */
 	protected abstract Minifier miniferForReader(Reader reader);
 
+	/**
+	 * Returns a list of filename "indexes" that will be used to construct the input
+	 * and expected output filenames.
+	 * 
+	 * @return list of filename "indexes"
+	 */
 	protected abstract List<String> resources();
 
+	/**
+	 * Loops over all filenames that can be constructed, reads in the source
+	 * content, minifies it, and compares the result to expected output.
+	 * 
+	 * @throws IOException if there are any resource reading issues
+	 */
 	@Test
 	public void actualOutputMatchesExpected() throws IOException {
 		for (String index : resources()) {
