@@ -219,7 +219,7 @@ public class JSMinifier extends AbstractMinifier {
 
 	/**
 	 * <p>
-	 * Copies the input to the output, deleting the characters which are
+	 * Copies from input to {@code writer}, deleting the characters which are
 	 * insignificant to Javascript. Specifically:
 	 * </p>
 	 * 
@@ -229,28 +229,21 @@ public class JSMinifier extends AbstractMinifier {
 	 * <li>carriage returns will be replaced with linefeeds; and</li>
 	 * <li>most spaces and linefeeds will be removed.</li>
 	 * </ul>
-	 * 
-	 * @throws IOException                        if thrown by {@link Reader} or
-	 *                                            {@link Writer}
-	 * @throws UnterminatedRegExpLiteralException if this method encounters an
-	 *                                            unterminated regular expression
-	 *                                            literal
-	 * @throws UnterminatedCommentException       if this method encounters an
-	 *                                            unterminated comment
-	 * @throws UnterminatedStringLiteralException if this method encounters an
-	 *                                            unterminated string literal
+	 *
+	 * @param writer {@link Writer} for output
 	 */
-	public void minify(Writer out) {
+	@Override
+	public void minify(Writer writer) {
 		try {
 			theA = '\n';
-			action(3, out);
+			action(3, writer);
 			while (theA != EOF) {
 				switch (theA) {
 				case ' ':
 					if (isAlphanum(theB)) {
-						action(1, out);
+						action(1, writer);
 					} else {
-						action(2, out);
+						action(2, writer);
 					}
 					break;
 				case '\n':
@@ -260,16 +253,16 @@ public class JSMinifier extends AbstractMinifier {
 					case '(':
 					case '+':
 					case '-':
-						action(1, out);
+						action(1, writer);
 						break;
 					case ' ':
-						action(3, out);
+						action(3, writer);
 						break;
 					default:
 						if (isAlphanum(theB)) {
-							action(1, out);
+							action(1, writer);
 						} else {
-							action(2, out);
+							action(2, writer);
 						}
 					}
 					break;
@@ -277,10 +270,10 @@ public class JSMinifier extends AbstractMinifier {
 					switch (theB) {
 					case ' ':
 						if (isAlphanum(theA)) {
-							action(1, out);
+							action(1, writer);
 							break;
 						}
-						action(3, out);
+						action(3, writer);
 						break;
 					case '\n':
 						switch (theA) {
@@ -291,23 +284,23 @@ public class JSMinifier extends AbstractMinifier {
 						case '-':
 						case '"':
 						case '\'':
-							action(1, out);
+							action(1, writer);
 							break;
 						default:
 							if (isAlphanum(theA)) {
-								action(1, out);
+								action(1, writer);
 							} else {
-								action(3, out);
+								action(3, writer);
 							}
 						}
 						break;
 					default:
-						action(1, out);
+						action(1, writer);
 						break;
 					}
 				}
 			}
-			out.flush();
+			writer.flush();
 		} catch (Exception e) {
 			// TODO...
 		}

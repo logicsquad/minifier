@@ -6,7 +6,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Vector;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -103,8 +103,9 @@ public class CSSMinifier extends AbstractMinifier {
 			
 			String s;
 			while ((s = br.readLine()) != null) {
-				if (s.trim().equals(""))
+				if (s.trim().equals("")) {
 					continue;
+				}
 				sb.append(s);
 			}
 
@@ -123,7 +124,7 @@ public class CSSMinifier extends AbstractMinifier {
 				sb.delete(n, k + 2);
 			}
 			LOG.debug("Parsing and processing selectors...");
-			Vector<Selector> selectors = new Vector<Selector>();
+			List<Selector> selectors = new ArrayList<>();
 			n = 0;
 			j = 0;
 			k = 0;
@@ -138,7 +139,7 @@ public class CSSMinifier extends AbstractMinifier {
 					j--;
 					if (j == 0) {
 						try {
-							selectors.addElement(new Selector(sb.substring(n, i + 1)));
+							selectors.add(new Selector(sb.substring(n, i + 1)));
 						} catch (UnterminatedSelectorException usex) {
 							LOG.debug("Unterminated selector: {}", usex.getMessage());
 						} catch (EmptySelectorBodyException ebex) {
@@ -171,7 +172,7 @@ public class CSSMinifier extends AbstractMinifier {
 	 */
 	private static class Selector {
 		private Property[] properties = null;
-		private Vector<Selector> subSelectors = null;
+		private List<Selector> subSelectors = null;
 		private String selector;
 
 		/**
@@ -196,13 +197,13 @@ public class CSSMinifier extends AbstractMinifier {
 
 			// We're dealing with a nested property, eg @-webkit-keyframes
 			if (parts.length > 2) {
-				this.subSelectors = new Vector<Selector>();
+				this.subSelectors = new ArrayList<>();
 				parts = selector.split("(\\s*\\{\\s*)|(\\s*\\}\\s*)");
 				for (int i = 1; i < parts.length; i += 2) {
 					parts[i] = parts[i].trim();
 					parts[i + 1] = parts[i + 1].trim();
 					if (!(parts[i].equals("") || (parts[i + 1].equals("")))) {
-						this.subSelectors.addElement(new Selector(parts[i] + "{" + parts[i + 1] + "}"));
+						this.subSelectors.add(new Selector(parts[i] + "{" + parts[i + 1] + "}"));
 					}
 				}
 			} else {
@@ -256,7 +257,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 * @returns An array of properties parsed from this selector.
 		 */
 		private ArrayList<Property> parseProperties(String contents) {
-			ArrayList<String> parts = new ArrayList<String>();
+			List<String> parts = new ArrayList<>();
 			boolean bInsideString = false, bInsideURL = false;
 			int j = 0;
 			String substr;
@@ -333,14 +334,16 @@ public class CSSMinifier extends AbstractMinifier {
 						bCanSplit = false;
 					} else if (property.charAt(i) == ':' && parts.size() < 1) {
 						substr = property.substring(j, i);
-						if (!(substr.trim().equals("") || (substr == null)))
+						if (!(substr.trim().equals("") || (substr == null))) {
 							parts.add(substr);
+						}
 						j = i + 1;
 					}
 				}
 				substr = property.substring(j, property.length());
-				if (!(substr.trim().equals("") || (substr == null)))
+				if (!(substr.trim().equals("") || (substr == null))) {
 					parts.add(substr);
+				}
 				if (parts.size() < 2) {
 					throw new IncompletePropertyException(property);
 				}
