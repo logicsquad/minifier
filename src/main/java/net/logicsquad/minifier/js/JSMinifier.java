@@ -316,21 +316,21 @@ public class JSMinifier extends AbstractMinifier {
 	/**
 	 * Exception representing an unterminated comment.
 	 */
-	class UnterminatedCommentException extends Exception {
+	private static class UnterminatedCommentException extends Exception {
 		private static final long serialVersionUID = 7971352218559346169L;
 	}
 
 	/**
 	 * Exception representing an unterminated string literal.
 	 */
-	class UnterminatedStringLiteralException extends Exception {
+	private static class UnterminatedStringLiteralException extends Exception {
 		private static final long serialVersionUID = 3813645314180522143L;
 	}
 
 	/**
 	 * Exception representing an unterminated regular expression literal.
 	 */
-	class UnterminatedRegExpLiteralException extends Exception {
+	private static class UnterminatedRegExpLiteralException extends Exception {
 		private static final long serialVersionUID = -5088088141334641219L;
 	}
 }
