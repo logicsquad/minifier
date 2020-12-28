@@ -9,7 +9,7 @@ import net.logicsquad.minifier.Minifier;
 
 /**
  * Unit tests on {@link Minifier} class.
- * 
+ *
  * @author paulh
  */
 public class CSSMinifierTest extends AbstractMinifierTest {

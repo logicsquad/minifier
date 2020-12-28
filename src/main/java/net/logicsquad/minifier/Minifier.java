@@ -14,7 +14,7 @@ public interface Minifier {
 	/**
 	 * Minifies the web resource represented by this object, and writes out the
 	 * result to {@code writer}.
-	 * 
+	 *
 	 * @param writer a {@link Writer}
 	 */
 	void minify(Writer writer);

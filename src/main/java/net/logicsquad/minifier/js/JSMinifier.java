@@ -38,7 +38,7 @@ public class JSMinifier extends AbstractMinifier {
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
-	 * 
+	 *
 	 * @param reader a {@link Reader}
 	 */
 	public JSMinifier(Reader reader) {
@@ -50,7 +50,7 @@ public class JSMinifier extends AbstractMinifier {
 	/**
 	 * Is {@code c} a letter, digit, underscore, dollar sign, or non-ASCII
 	 * character?
-	 * 
+	 *
 	 * @param c a character
 	 * @return {@code true} if {@code c} is alphanumeric, otherwise {@code false}
 	 */
@@ -64,12 +64,12 @@ public class JSMinifier extends AbstractMinifier {
 	 * Returns next character from {@link #in}. If the character is a control
 	 * character, translates:
 	 * </p>
-	 * 
+	 *
 	 * <ul>
 	 * <li>{@code \r} to {@code \n}; and</li>
 	 * <li>everything else to a space.</li>
 	 * </ul>
-	 * 
+	 *
 	 * @return next (translated) character from {@link #in}
 	 * @throws IOException if unable to {@link Reader#read()}
 	 */
@@ -88,7 +88,7 @@ public class JSMinifier extends AbstractMinifier {
 	 * Returns next character from {@link #in} (with no translation), without
 	 * removing it from {@link #in}. (That is, a subsequent call to {@link #get()}
 	 * will return the character again.)
-	 * 
+	 *
 	 * @return next character
 	 * @throws IOException if unable to {@link Reader#read()} or
 	 *                     {@link PushbackReader#unread(char[])}
@@ -101,7 +101,7 @@ public class JSMinifier extends AbstractMinifier {
 
 	/**
 	 * Returns the next character from {@link #in}, <em>excluding comments</em>.
-	 * 
+	 *
 	 * @return next character (excluding comments)
 	 * @throws IOException                  if thrown by {@link #get()} or
 	 *                                      {@link #peek()}
@@ -143,7 +143,7 @@ public class JSMinifier extends AbstractMinifier {
 	 * <p>
 	 * Performs an action based on {@code d}:
 	 * </p>
-	 * 
+	 *
 	 * <dl>
 	 * <dt>1</dt>
 	 * <dd>Output A. Copy B to A. Get the next B.</dd>
@@ -152,13 +152,13 @@ public class JSMinifier extends AbstractMinifier {
 	 * <dt>3</dt>
 	 * <dd>Get the next B. (Delete B).</dd>
 	 * </dl>
-	 * 
+	 *
 	 * <p>
 	 * String and regular expressions are treated as "single characters", in that
 	 * they are pushed through the pipeline in their entirety by a single call to
 	 * this method.
 	 * <p>
-	 * 
+	 *
 	 * @param d type of action
 	 * @throws IOException                        if thrown by {@link Reader} or
 	 *                                            {@link Writer}
@@ -222,7 +222,7 @@ public class JSMinifier extends AbstractMinifier {
 	 * Copies from input to {@code writer}, deleting the characters which are
 	 * insignificant to Javascript. Specifically:
 	 * </p>
-	 * 
+	 *
 	 * <ul>
 	 * <li>comments will be removed;</li>
 	 * <li>tabs will be replaced with spaces;</li>

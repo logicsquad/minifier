@@ -18,7 +18,7 @@ import net.logicsquad.minifier.css.CSSMinifierTest;
 /**
  * Parent class for tests that compare results from known input to expected
  * output.
- * 
+ *
  * @author paulh
  */
 public abstract class AbstractMinifierTest {
@@ -29,14 +29,14 @@ public abstract class AbstractMinifierTest {
 
 	/**
 	 * Returns file extension to look for.
-	 * 
+	 *
 	 * @return file extension
 	 */
 	protected abstract String extension();
 
 	/**
 	 * Returns a {@link Reader} for source file with "index" {@code index}.
-	 * 
+	 *
 	 * @param index source file index
 	 * @return {@link Reader}
 	 */
@@ -48,7 +48,7 @@ public abstract class AbstractMinifierTest {
 	/**
 	 * Returns string containing the content of expected output with index
 	 * {@code index}.
-	 * 
+	 *
 	 * @param index expected output file index
 	 * @return expected output
 	 * @throws IOException if file can't be read
@@ -61,7 +61,7 @@ public abstract class AbstractMinifierTest {
 	/**
 	 * Returns a {@link Minifier} for {@code reader}. Obviously, subclasses should
 	 * return an instance of the {@link Minifier} they are testing.
-	 * 
+	 *
 	 * @param reader a {@link Reader} supplying source content
 	 * @return {@link Minifier} to test
 	 */
@@ -70,7 +70,7 @@ public abstract class AbstractMinifierTest {
 	/**
 	 * Returns a list of filename "indexes" that will be used to construct the input
 	 * and expected output filenames.
-	 * 
+	 *
 	 * @return list of filename "indexes"
 	 */
 	protected abstract List<String> resources();
@@ -78,7 +78,7 @@ public abstract class AbstractMinifierTest {
 	/**
 	 * Loops over all filenames that can be constructed, reads in the source
 	 * content, minifies it, and compares the result to expected output.
-	 * 
+	 *
 	 * @throws IOException if there are any resource reading issues
 	 */
 	@Test

@@ -6,7 +6,7 @@ import java.io.Writer;
 /**
  * Abstract parent class that {@link Minifier} implementations can extend.
  * Provides a constructor taking a {@link Reader}.
- * 
+ *
  * @author paulh
  */
 public abstract class AbstractMinifier implements Minifier {
@@ -17,7 +17,7 @@ public abstract class AbstractMinifier implements Minifier {
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
-	 * 
+	 *
 	 * @param reader a {@link Reader}
 	 */
 	public AbstractMinifier(Reader reader) {

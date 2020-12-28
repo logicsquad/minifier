@@ -18,7 +18,7 @@ import net.logicsquad.minifier.AbstractMinifier;
 
 /**
  * Strips comments and whitespace from CSS input.
- * 
+ *
  * @author paulh
  * @author Barry van Oudtshoorn
  */
@@ -82,7 +82,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
-	 * 
+	 *
 	 * @param reader a {@link Reader}
 	 */
 	public CSSMinifier(Reader reader) {
@@ -100,7 +100,7 @@ public class CSSMinifier extends AbstractMinifier {
 			StringBuffer sb = new StringBuffer();
 
 			PrintWriter pout = new PrintWriter(out);
-			
+
 			String s;
 			while ((s = br.readLine()) != null) {
 				if (s.trim().equals("")) {
@@ -166,7 +166,7 @@ public class CSSMinifier extends AbstractMinifier {
 			LOG.debug("Caught Exception in minify().", ex);
 		}
 	}
-	
+
 	/**
 	 * Represents a CSS selector.
 	 */
@@ -177,7 +177,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Creates a new Selector using the supplied strings.
-		 * 
+		 *
 		 * @param selector The selector; for example, "div { border: solid 1px red;
 		 *                 color: blue; }"
 		 * @throws Exception If the selector is incomplete and cannot be parsed.
@@ -227,7 +227,7 @@ public class CSSMinifier extends AbstractMinifier {
 		/**
 		 * Prints out this selector and its contents nicely, with the contents sorted
 		 * alphabetically.
-		 * 
+		 *
 		 * @returns A string representing this selector, minified.
 		 */
 		public String toString() {
@@ -252,7 +252,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Parses out the properties of a selector's body.
-		 * 
+		 *
 		 * @param contents The body; for example, "border: solid 1px red; color: blue;"
 		 * @returns An array of properties parsed from this selector.
 		 */
@@ -296,7 +296,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Sorts the properties array to enhance gzipping.
-		 * 
+		 *
 		 * @param properties The array to be sorted.
 		 */
 		private void sortProperties(Property[] properties) {
@@ -314,7 +314,7 @@ public class CSSMinifier extends AbstractMinifier {
 		/**
 		 * Creates a new Property using the supplied strings. Parses out the values of
 		 * the property selector.
-		 * 
+		 *
 		 * @param property The property; for example, "border: solid 1px red;" or
 		 *                 "-moz-box-shadow: 3px 3px 3px rgba(255, 255, 0, 0.5);".
 		 * @throws Exception If the property is incomplete and cannot be parsed.
@@ -363,7 +363,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Prints out this property nicely.
-		 * 
+		 *
 		 * @returns A string representing this property, minified.
 		 */
 		public String toString() {
@@ -405,7 +405,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Parse the values out of a property.
-		 * 
+		 *
 		 * @param contents The property to parse
 		 * @returns An array of Parts
 		 */
@@ -473,7 +473,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Create a new property by parsing the given string.
-		 * 
+		 *
 		 * @param contents The string to parse.
 		 * @throws Exception If the part cannot be parsed.
 		 */
@@ -635,7 +635,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Returns itself.
-		 * 
+		 *
 		 * @returns this part's string representation.
 		 */
 		public String toString() {
@@ -674,7 +674,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Constructor taking a message
-		 * 
+		 *
 		 * @param message a message
 		 */
 		public IncompletePropertyException(String message) {
@@ -693,7 +693,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Constructor taking a message
-		 * 
+		 *
 		 * @param message a message
 		 */
 		public EmptySelectorBodyException(String message) {
@@ -712,7 +712,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Constructor taking a message
-		 * 
+		 *
 		 * @param message a message
 		 */
 		public UnterminatedSelectorException(String message) {
@@ -731,7 +731,7 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Constructor taking a message
-		 * 
+		 *
 		 * @param message a message
 		 */
 		public IncompleteSelectorException(String message) {
