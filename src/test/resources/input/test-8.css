@@ -1,0 +1,4 @@
+.myclass:not(:first-child)::before:hover {  
+	color: red; 
+	background:    url(http://www.image.com/mobile-sprite.png); 
+} 
