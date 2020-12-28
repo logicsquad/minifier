@@ -22,11 +22,11 @@ import net.logicsquad.minifier.AbstractMinifier;
  * @author paulh
  * @author Barry van Oudtshoorn
  */
-public class CSSMin extends AbstractMinifier {
+public class CSSMinifier extends AbstractMinifier {
 	/**
 	 * Logger
 	 */
-	private static final Logger LOG = LoggerFactory.getLogger(CSSMin.class);
+	private static final Logger LOG = LoggerFactory.getLogger(CSSMinifier.class);
 
 	/**
 	 * Symbolic colour names defined by HTML
@@ -85,7 +85,7 @@ public class CSSMin extends AbstractMinifier {
 	 * 
 	 * @param reader a {@link Reader}
 	 */
-	public CSSMin(Reader reader) {
+	public CSSMinifier(Reader reader) {
 		super(reader);
 	}
 

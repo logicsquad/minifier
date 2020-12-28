@@ -13,7 +13,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import net.logicsquad.minifier.css.CSSMinTest;
+import net.logicsquad.minifier.css.CSSMinifierTest;
 
 /**
  * Parent class for tests that compare results from known input to expected
@@ -42,7 +42,7 @@ public abstract class AbstractMinifierTest {
 	 */
 	protected Reader readerForSourceFile(String index) {
 		String sourceFile = "input/test-" + index + "." + extension();
-		return new InputStreamReader(CSSMinTest.class.getClassLoader().getResourceAsStream(sourceFile));
+		return new InputStreamReader(CSSMinifierTest.class.getClassLoader().getResourceAsStream(sourceFile));
 	}
 
 	/**

@@ -8,11 +8,11 @@ import net.logicsquad.minifier.AbstractMinifierTest;
 import net.logicsquad.minifier.Minifier;
 
 /**
- * Unit tests on {@link JSMin} class.
+ * Unit tests on {@link JSMinifier} class.
  * 
  * @author paulh
  */
-public class JSMinTest extends AbstractMinifierTest {
+public class JSMinifierTest extends AbstractMinifierTest {
 	/**
 	 * Indexes for input/output resources
 	 */
@@ -30,7 +30,7 @@ public class JSMinTest extends AbstractMinifierTest {
 
 	@Override
 	protected Minifier miniferForReader(Reader reader) {
-		return new JSMin(reader);
+		return new JSMinifier(reader);
 	}
 
 	@Override

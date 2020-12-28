@@ -15,7 +15,7 @@ import net.logicsquad.minifier.AbstractMinifier;
  * @author John Reilly
  * @author Douglas Crockford
  */
-public class JSMin extends AbstractMinifier {
+public class JSMinifier extends AbstractMinifier {
 	/**
 	 * End of file
 	 */
@@ -41,7 +41,7 @@ public class JSMin extends AbstractMinifier {
 	 * 
 	 * @param reader a {@link Reader}
 	 */
-	public JSMin(Reader reader) {
+	public JSMinifier(Reader reader) {
 		super(reader);
 		this.in = new PushbackReader(reader);
 		return;

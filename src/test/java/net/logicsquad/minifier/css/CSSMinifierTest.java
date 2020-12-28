@@ -12,7 +12,7 @@ import net.logicsquad.minifier.Minifier;
  * 
  * @author paulh
  */
-public class CSSMinTest extends AbstractMinifierTest {
+public class CSSMinifierTest extends AbstractMinifierTest {
 	/**
 	 * Indexes for input/output resources
 	 */
@@ -31,7 +31,7 @@ public class CSSMinTest extends AbstractMinifierTest {
 
 	@Override
 	protected Minifier miniferForReader(Reader reader) {
-		return new CSSMin(reader);
+		return new CSSMinifier(reader);
 	}
 
 	@Override
