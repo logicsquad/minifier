@@ -5,6 +5,8 @@ import java.io.PushbackReader;
 import java.io.Reader;
 import java.io.Writer;
 
+import net.logicsquad.minifier.AbstractMinifier;
+
 /**
  * Strips comments and whitespace from Javascript input.
  *
@@ -13,7 +15,7 @@ import java.io.Writer;
  * @author John Reilly
  * @author Douglas Crockford
  */
-public class JSMin {
+public class JSMin extends AbstractMinifier {
 	/**
 	 * End of file
 	 */
@@ -23,11 +25,6 @@ public class JSMin {
 	 * {@link PushbackReader} to wrap {@link Reader} supplied to constructor
 	 */
 	private final PushbackReader in;
-
-	/**
-	 * {@link Writer} for minified output
-	 */
-	private final Writer out;
 
 	/**
 	 * First character in two-character "cursor" over source
@@ -40,14 +37,13 @@ public class JSMin {
 	private int theB;
 
 	/**
-	 * Constructor taking a {@link Reader} and a {@link Writer}.
+	 * Constructor taking a {@link Reader} that will provide the input resource.
 	 * 
-	 * @param in  {@link Reader} providing Javascript input
-	 * @param out destination {@link Writer} for stripped output
+	 * @param reader a {@link Reader}
 	 */
-	public JSMin(final Reader in, final Writer out) {
-		this.in = new PushbackReader(in);
-		this.out = out;
+	public JSMin(Reader reader) {
+		super(reader);
+		this.in = new PushbackReader(reader);
 		return;
 	}
 
@@ -174,7 +170,7 @@ public class JSMin {
 	 * @throws UnterminatedStringLiteralException if this method encounters an
 	 *                                            unterminated string literal
 	 */
-	void action(final int d) throws IOException, UnterminatedRegExpLiteralException, UnterminatedCommentException,
+	void action(final int d, Writer out) throws IOException, UnterminatedRegExpLiteralException, UnterminatedCommentException,
 			UnterminatedStringLiteralException {
 		switch (d) {
 		case 1:
@@ -244,74 +240,77 @@ public class JSMin {
 	 * @throws UnterminatedStringLiteralException if this method encounters an
 	 *                                            unterminated string literal
 	 */
-	public void jsmin() throws IOException, UnterminatedRegExpLiteralException, UnterminatedCommentException,
-			UnterminatedStringLiteralException {
-		theA = '\n';
-		action(3);
-		while (theA != EOF) {
-			switch (theA) {
-			case ' ':
-				if (isAlphanum(theB)) {
-					action(1);
-				} else {
-					action(2);
-				}
-				break;
-			case '\n':
-				switch (theB) {
-				case '{':
-				case '[':
-				case '(':
-				case '+':
-				case '-':
-					action(1);
-					break;
+	public void minify(Writer out) {
+		try {
+			theA = '\n';
+			action(3, out);
+			while (theA != EOF) {
+				switch (theA) {
 				case ' ':
-					action(3);
-					break;
-				default:
 					if (isAlphanum(theB)) {
-						action(1);
+						action(1, out);
 					} else {
-						action(2);
+						action(2, out);
 					}
-				}
-				break;
-			default:
-				switch (theB) {
-				case ' ':
-					if (isAlphanum(theA)) {
-						action(1);
-						break;
-					}
-					action(3);
 					break;
 				case '\n':
-					switch (theA) {
-					case '}':
-					case ']':
-					case ')':
+					switch (theB) {
+					case '{':
+					case '[':
+					case '(':
 					case '+':
 					case '-':
-					case '"':
-					case '\'':
-						action(1);
+						action(1, out);
+						break;
+					case ' ':
+						action(3, out);
 						break;
 					default:
-						if (isAlphanum(theA)) {
-							action(1);
+						if (isAlphanum(theB)) {
+							action(1, out);
 						} else {
-							action(3);
+							action(2, out);
 						}
 					}
 					break;
 				default:
-					action(1);
-					break;
+					switch (theB) {
+					case ' ':
+						if (isAlphanum(theA)) {
+							action(1, out);
+							break;
+						}
+						action(3, out);
+						break;
+					case '\n':
+						switch (theA) {
+						case '}':
+						case ']':
+						case ')':
+						case '+':
+						case '-':
+						case '"':
+						case '\'':
+							action(1, out);
+							break;
+						default:
+							if (isAlphanum(theA)) {
+								action(1, out);
+							} else {
+								action(3, out);
+							}
+						}
+						break;
+					default:
+						action(1, out);
+						break;
+					}
 				}
 			}
+			out.flush();
+		} catch (Exception e) {
+			// TODO...
 		}
-		out.flush();
 	}
 
 	/**

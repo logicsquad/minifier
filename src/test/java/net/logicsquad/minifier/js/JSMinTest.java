@@ -41,8 +41,8 @@ public class JSMinTest extends AbstractTest {
 			UnterminatedCommentException, UnterminatedStringLiteralException {
 		for (String index : RESOURCES) {
 			Writer writer = new StringWriter();
-			JSMin jsmin = new JSMin(readerForSourceFile(index), writer);
-			jsmin.jsmin();
+			JSMin jsmin = new JSMin(readerForSourceFile(index));
+			jsmin.minify(writer);
 			String expected = stringForExpectedFile(index);
 			assertEquals(expected.trim(), writer.toString().trim());
 		}

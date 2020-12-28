@@ -2,9 +2,9 @@ package net.logicsquad.minifier.css;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.Arrays;
 import java.util.List;
 
@@ -37,12 +37,12 @@ public class CSSMinTest extends AbstractTest {
 	@Test
 	public void actualOutputMatchesExpected() throws IOException {
 		for (String index : RESOURCES) {
-			ByteArrayOutputStream out = new ByteArrayOutputStream();
-			CSSMin.formatFile(readerForSourceFile(index), out);
+			Writer out = new StringWriter();
+			CSSMin min = new CSSMin(readerForSourceFile(index));
+			min.minify(out);
 			String expected = stringForExpectedFile(index);
-			String actual = new String(out.toByteArray(), StandardCharsets.UTF_8);
 			// trim() here because there seems to be a difference in line endings
-			assertEquals(expected.trim(), actual.trim());
+			assertEquals(expected.trim(), out.toString().trim());
 		}
 		return;
 	}

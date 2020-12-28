@@ -1,10 +1,9 @@
 package net.logicsquad.minifier.css;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.OutputStream;
-import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.Reader;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Vector;
@@ -12,13 +11,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import net.logicsquad.minifier.AbstractMinifier;
+
 /**
  * Strips comments and whitespace from CSS input.
  * 
  * @author paulh
  * @author Barry van Oudtshoorn
  */
-public class CSSMin {
+public class CSSMin extends AbstractMinifier {
 	/**
 	 * Symbolic colour names defined by HTML
 	 */
@@ -74,44 +75,26 @@ public class CSSMin {
 	protected static boolean bDebug = false;
 
 	/**
-	 * Process a file from a filename.
+	 * Constructor taking a {@link Reader} that will provide the input resource.
 	 * 
-	 * @param filename The file name of the CSS file to process.
-	 * @param out      Where to send the result
+	 * @param reader a {@link Reader}
 	 */
-	public static void formatFile(String filename, OutputStream out) {
-		try {
-			formatFile(new FileReader(filename), out);
-		} catch (java.io.FileNotFoundException e) {
-			System.out.println(e.getMessage());
-		}
+	public CSSMin(Reader reader) {
+		super(reader);
 	}
 
-	/**
-	 * Process input from a reader.
-	 * 
-	 * @param input  Where to read the CSS from
-	 * @param output Where to send the result
-	 */
-	public static void formatFile(Reader input, OutputStream out) {
-		formatFile(input, new PrintStream(out));
-	}
-
-	/**
-	 * Minify CSS from a reader to a printstream.
-	 * 
-	 * @param input Where to read the CSS from
-	 * @param out   Where to write the result to
-	 */
-	public static void formatFile(Reader input, PrintStream out) {
+	@Override
+	public void minify(Writer out) {
 		try {
 			int k, j, // Number of open braces
 					n; // Current position in stream
 			char curr;
 
-			BufferedReader br = new BufferedReader(input);
+			BufferedReader br = new BufferedReader(reader);
 			StringBuffer sb = new StringBuffer();
 
+			PrintWriter pout = new PrintWriter(out);
+			
 			if (bDebug) {
 				System.err.println("Reading file into StringBuffer...");
 			}
@@ -174,9 +157,9 @@ public class CSSMin {
 			}
 
 			for (Selector selector : selectors) {
-				out.print(selector.toString());
+				pout.print(selector.toString());
 			}
-			out.print("\r\n");
+			pout.print("\r\n");
 
 			out.close();
 
@@ -193,7 +176,7 @@ public class CSSMin {
 			System.out.println(ex.getMessage());
 		}
 	}
-
+	
 	/**
 	 * Represents a CSS selector.
 	 */
