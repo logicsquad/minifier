@@ -11,6 +11,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import net.logicsquad.minifier.AbstractMinifier;
 
 /**
@@ -20,6 +23,11 @@ import net.logicsquad.minifier.AbstractMinifier;
  * @author Barry van Oudtshoorn
  */
 public class CSSMin extends AbstractMinifier {
+	/**
+	 * Logger
+	 */
+	private static final Logger LOG = LoggerFactory.getLogger(CSSMin.class);
+
 	/**
 	 * Symbolic colour names defined by HTML
 	 */
@@ -72,8 +80,6 @@ public class CSSMin extends AbstractMinifier {
 	 */
 	private static final String[] FONT_WEIGHT_VALUES = { "400", "700", "900", "100" };
 
-	protected static boolean bDebug = false;
-
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
 	 * 
@@ -95,9 +101,6 @@ public class CSSMin extends AbstractMinifier {
 
 			PrintWriter pout = new PrintWriter(out);
 			
-			if (bDebug) {
-				System.err.println("Reading file into StringBuffer...");
-			}
 			String s;
 			while ((s = br.readLine()) != null) {
 				if (s.trim().equals(""))
@@ -105,9 +108,7 @@ public class CSSMin extends AbstractMinifier {
 				sb.append(s);
 			}
 
-			if (bDebug) {
-				System.err.println("Removing comments...");
-			}
+			LOG.debug("Removing comments...");
 			// Find the start of the comment
 			n = 0;
 			while ((n = sb.indexOf("/*", n)) != -1) {
@@ -121,14 +122,7 @@ public class CSSMin extends AbstractMinifier {
 				}
 				sb.delete(n, k + 2);
 			}
-			if (bDebug) {
-				System.err.println(sb.toString());
-				System.err.println("\n\n");
-			}
-
-			if (bDebug) {
-				System.err.println("Parsing and processing selectors...");
-			}
+			LOG.debug("Parsing and processing selectors...");
 			Vector<Selector> selectors = new Vector<Selector>();
 			n = 0;
 			j = 0;
@@ -146,10 +140,9 @@ public class CSSMin extends AbstractMinifier {
 						try {
 							selectors.addElement(new Selector(sb.substring(n, i + 1)));
 						} catch (UnterminatedSelectorException usex) {
-							System.out.println("Unterminated selector: " + usex.getMessage());
+							LOG.debug("Unterminated selector: {}", usex.getMessage());
 						} catch (EmptySelectorBodyException ebex) {
-							if (bDebug)
-								System.out.println("Empty selector body: " + ebex.getMessage());
+							LOG.debug("Empty selector body: {}", ebex.getMessage());
 						}
 						n = i + 1;
 					}
@@ -163,17 +156,13 @@ public class CSSMin extends AbstractMinifier {
 
 			out.close();
 
-			if (bDebug) {
-				System.err.println("Process completed successfully.");
-			}
-
+			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException ucex) {
-			System.out.println("Unterminated comment.");
+			LOG.debug("Unterminated comment!", ucex);
 		} catch (UnbalancedBracesException ubex) {
-			System.out.println("Unbalanced braces.");
+			LOG.debug("Unbalanced braces!", ubex);
 		} catch (Exception ex) {
-			ex.printStackTrace(System.err);
-			System.out.println(ex.getMessage());
+			LOG.debug("Caught Exception in minify().", ex);
 		}
 	}
 	
@@ -218,10 +207,8 @@ public class CSSMin extends AbstractMinifier {
 				}
 			} else {
 				String contents = parts[parts.length - 1].trim();
-				if (bDebug) {
-					System.err.println("Parsing selector: " + this.selector);
-					System.err.println("\t" + contents);
-				}
+				LOG.debug("Parsing selector: {}", this.selector);
+				LOG.debug("\t{}", contents);
 				if (contents.charAt(contents.length() - 1) != '}') { // Ensure that we have a leading and trailing brace.
 					throw new UnterminatedSelectorException(selector);
 				}
@@ -299,8 +286,7 @@ public class CSSMin extends AbstractMinifier {
 				try {
 					results.add(new Property(parts.get(i)));
 				} catch (IncompletePropertyException ipex) {
-					System.out.println(
-							"Incomplete property in selector \"" + this.selector + "\": \"" + ipex.getMessage() + "\"");
+					LOG.debug("Incomplete property in selector '{}': {}", selector, ipex.getMessage());
 				}
 			}
 
@@ -339,9 +325,7 @@ public class CSSMin extends AbstractMinifier {
 				boolean bCanSplit = true;
 				int j = 0;
 				String substr;
-				if (bDebug) {
-					System.err.println("\t\tExamining property: " + property);
-				}
+				LOG.debug("\t\tExamining property: {}", property);
 				for (int i = 0; i < property.length(); i++) {
 					if (!bCanSplit) { // If we're inside a string
 						bCanSplit = (property.charAt(i) == '"');
@@ -387,9 +371,6 @@ public class CSSMin extends AbstractMinifier {
 			}
 			sb.deleteCharAt(sb.length() - 1); // Delete the trailing comma.
 			sb.append(";");
-			if (bDebug) {
-				System.err.println(sb.toString());
-			}
 			return sb.toString();
 		}
 
@@ -433,7 +414,7 @@ public class CSSMin extends AbstractMinifier {
 				try {
 					results[i] = new Part(parts[i], property);
 				} catch (Exception e) {
-					System.out.println(e.getMessage());
+					LOG.debug("Exception in parseValues().", e);
 					results[i] = null;
 				}
 			}
