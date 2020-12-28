@@ -1,23 +1,18 @@
 package net.logicsquad.minifier.css;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
+import java.io.Reader;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.jupiter.api.Test;
-
-import net.logicsquad.minifier.AbstractTest;
+import net.logicsquad.minifier.AbstractMinifierTest;
+import net.logicsquad.minifier.Minifier;
 
 /**
  * Unit tests on {@link Minifier} class.
  * 
  * @author paulh
  */
-public class CSSMinTest extends AbstractTest {
+public class CSSMinTest extends AbstractMinifierTest {
 	/**
 	 * Indexes for input/output resources
 	 */
@@ -34,16 +29,13 @@ public class CSSMinTest extends AbstractTest {
 		return EXTENSION;
 	}
 
-	@Test
-	public void actualOutputMatchesExpected() throws IOException {
-		for (String index : RESOURCES) {
-			Writer out = new StringWriter();
-			CSSMin min = new CSSMin(readerForSourceFile(index));
-			min.minify(out);
-			String expected = stringForExpectedFile(index);
-			// trim() here because there seems to be a difference in line endings
-			assertEquals(expected.trim(), out.toString().trim());
-		}
-		return;
+	@Override
+	protected Minifier miniferForReader(Reader reader) {
+		return new CSSMin(reader);
+	}
+
+	@Override
+	protected List<String> resources() {
+		return RESOURCES;
 	}
 }

@@ -1,10 +1,17 @@
 package net.logicsquad.minifier;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
 
 import net.logicsquad.minifier.css.CSSMinTest;
 
@@ -14,7 +21,7 @@ import net.logicsquad.minifier.css.CSSMinTest;
  * 
  * @author paulh
  */
-public abstract class AbstractTest {
+public abstract class AbstractMinifierTest {
 	/**
 	 * Resource directory
 	 */
@@ -49,5 +56,22 @@ public abstract class AbstractTest {
 	protected String stringForExpectedFile(String index) throws IOException {
 		String expectedFile = "output/test-" + index + "." + extension();
 		return new String(Files.readAllBytes(Paths.get(RESOURCES_DIR, expectedFile)));
+	}
+
+	protected abstract Minifier miniferForReader(Reader reader);
+
+	protected abstract List<String> resources();
+
+	@Test
+	public void actualOutputMatchesExpected() throws IOException {
+		for (String index : resources()) {
+			Writer out = new StringWriter();
+			Minifier min = miniferForReader(readerForSourceFile(index));
+			min.minify(out);
+			String expected = stringForExpectedFile(index);
+			// trim() here because there seems to be a difference in line endings
+			assertEquals(expected.trim(), out.toString().trim());
+		}
+		return;
 	}
 }
