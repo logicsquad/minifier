@@ -96,7 +96,7 @@ public class CSSMinifier extends AbstractMinifier {
 					n; // Current position in stream
 			char curr;
 
-			BufferedReader br = new BufferedReader(reader);
+			BufferedReader br = new BufferedReader(reader());
 			StringBuffer sb = new StringBuffer();
 
 			PrintWriter pout = new PrintWriter(out);

@@ -13,7 +13,7 @@ public abstract class AbstractMinifier implements Minifier {
 	/**
 	 * {@link Reader} supplying source content
 	 */
-	protected final Reader reader;
+	private final Reader reader;
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
@@ -27,4 +27,13 @@ public abstract class AbstractMinifier implements Minifier {
 
 	@Override
 	public abstract void minify(Writer writer);
+
+	/**
+	 * Returns {@link Reader} supplying source content for this object.
+	 * 
+	 * @return {@link Reader}
+	 */
+	protected Reader reader() {
+		return reader;
+	}
 }
