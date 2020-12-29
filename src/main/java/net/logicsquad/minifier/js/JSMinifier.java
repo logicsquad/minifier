@@ -140,8 +140,28 @@ public class JSMinifier extends AbstractMinifier {
 	}
 
 	/**
+	 * Represents an action for {@link #action(Action, Writer)} method.
+	 */
+	private enum Action {
+		/**
+		 * Output A, copy B to A, get the next B
+		 */
+		OUTPUT_COPY_GET,
+
+		/**
+		 * Copy B to A, get the next B
+		 */
+		COPY_GET,
+
+		/**
+		 * Get the next B
+		 */
+		GET;
+	}
+
+	/**
 	 * <p>
-	 * Performs an action based on {@code d}:
+	 * Performs an action based on {@code action}:
 	 * </p>
 	 *
 	 * <dl>
@@ -159,7 +179,8 @@ public class JSMinifier extends AbstractMinifier {
 	 * this method.
 	 * <p>
 	 *
-	 * @param d type of action
+	 * @param action type of action
+	 * @param out    {@link Writer} for minified output
 	 * @throws IOException                        if thrown by {@link Reader} or
 	 *                                            {@link Writer}
 	 * @throws UnterminatedRegExpLiteralException if this method encounters an
@@ -170,12 +191,12 @@ public class JSMinifier extends AbstractMinifier {
 	 * @throws UnterminatedStringLiteralException if this method encounters an
 	 *                                            unterminated string literal
 	 */
-	void action(final int d, Writer out) throws IOException, UnterminatedRegExpLiteralException, UnterminatedCommentException,
-			UnterminatedStringLiteralException {
-		switch (d) {
-		case 1:
+	void action(Action action, Writer out) throws IOException, UnterminatedRegExpLiteralException,
+			UnterminatedCommentException, UnterminatedStringLiteralException {
+		switch (action) {
+		case OUTPUT_COPY_GET:
 			out.write(theA);
-		case 2:
+		case COPY_GET:
 			theA = theB;
 			if (theA == '\'' || theA == '"') {
 				for (;;) {
@@ -193,7 +214,7 @@ public class JSMinifier extends AbstractMinifier {
 					}
 				}
 			}
-		case 3:
+		case GET:
 			theB = next();
 			if (theB == '/' && (theA == '(' || theA == ',' || theA == '=' || theA == ':' || theA == '[' || theA == '!'
 					|| theA == '&' || theA == '|' || theA == '?' || theA == '{' || theA == '}' || theA == ';'
@@ -236,14 +257,14 @@ public class JSMinifier extends AbstractMinifier {
 	public void minify(Writer writer) {
 		try {
 			theA = '\n';
-			action(3, writer);
+			action(Action.GET, writer);
 			while (theA != EOF) {
 				switch (theA) {
 				case ' ':
 					if (isAlphanum(theB)) {
-						action(1, writer);
+						action(Action.OUTPUT_COPY_GET, writer);
 					} else {
-						action(2, writer);
+						action(Action.COPY_GET, writer);
 					}
 					break;
 				case '\n':
@@ -253,16 +274,16 @@ public class JSMinifier extends AbstractMinifier {
 					case '(':
 					case '+':
 					case '-':
-						action(1, writer);
+						action(Action.OUTPUT_COPY_GET, writer);
 						break;
 					case ' ':
-						action(3, writer);
+						action(Action.GET, writer);
 						break;
 					default:
 						if (isAlphanum(theB)) {
-							action(1, writer);
+							action(Action.OUTPUT_COPY_GET, writer);
 						} else {
-							action(2, writer);
+							action(Action.COPY_GET, writer);
 						}
 					}
 					break;
@@ -270,10 +291,10 @@ public class JSMinifier extends AbstractMinifier {
 					switch (theB) {
 					case ' ':
 						if (isAlphanum(theA)) {
-							action(1, writer);
+							action(Action.OUTPUT_COPY_GET, writer);
 							break;
 						}
-						action(3, writer);
+						action(Action.GET, writer);
 						break;
 					case '\n':
 						switch (theA) {
@@ -284,18 +305,18 @@ public class JSMinifier extends AbstractMinifier {
 						case '-':
 						case '"':
 						case '\'':
-							action(1, writer);
+							action(Action.OUTPUT_COPY_GET, writer);
 							break;
 						default:
 							if (isAlphanum(theA)) {
-								action(1, writer);
+								action(Action.OUTPUT_COPY_GET, writer);
 							} else {
-								action(3, writer);
+								action(Action.GET, writer);
 							}
 						}
 						break;
 					default:
-						action(1, writer);
+						action(Action.OUTPUT_COPY_GET, writer);
 						break;
 					}
 				}
