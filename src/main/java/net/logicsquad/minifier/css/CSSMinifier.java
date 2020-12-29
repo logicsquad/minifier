@@ -273,14 +273,16 @@ public class CSSMinifier extends AbstractMinifier {
 						bInsideURL = true;
 				} else if (contents.charAt(i) == ';') {
 					substr = contents.substring(j, i);
-					if (!(substr.trim().equals("") || (substr == null)))
+					if (!(substr.trim().equals("") || (substr == null))) {
 						parts.add(substr);
+					}
 					j = i + 1;
 				}
 			}
 			substr = contents.substring(j, contents.length());
-			if (!(substr.trim().equals("") || (substr == null)))
+			if (!(substr.trim().equals("") || (substr == null))) {
 				parts.add(substr);
+			}
 
 			ArrayList<Property> results = new ArrayList<Property>();
 			for (int i = 0; i < parts.size(); i++) {
@@ -503,12 +505,15 @@ public class CSSMinifier extends AbstractMinifier {
 			this.contents = this.contents.trim();
 
 			// Simplify multiple zeroes
-			if (this.contents.equals("0 0 0 0"))
+			if (this.contents.equals("0 0 0 0")) {
 				this.contents = "0";
-			if (this.contents.equals("0 0 0"))
+			}
+			if (this.contents.equals("0 0 0")) {
 				this.contents = "0";
-			if (this.contents.equals("0 0"))
+			}
+			if (this.contents.equals("0 0")) {
 				this.contents = "0";
+			}
 
 			// Simplify multiple-parameter properties
 			simplifyParameters();
