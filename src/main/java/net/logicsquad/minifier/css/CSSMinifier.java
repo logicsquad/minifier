@@ -282,7 +282,7 @@ public class CSSMinifier extends AbstractMinifier {
 				}
 			}
 			substr = contents.substring(j, contents.length());
-			if (!(substr.trim().equals("") || (substr == null))) {
+			if (!substr.trim().equals("")) {
 				parts.add(substr);
 			}
 
@@ -345,7 +345,7 @@ public class CSSMinifier extends AbstractMinifier {
 					}
 				}
 				substr = property.substring(j, property.length());
-				if (!(substr.trim().equals("") || (substr == null))) {
+				if (!substr.trim().equals("")) {
 					parts.add(substr);
 				}
 				if (parts.size() < 2) {
