@@ -235,6 +235,7 @@ public class JSMinifier extends AbstractMinifier {
 				}
 				theB = next();
 			}
+			break;
 		default:
 			throw new IllegalStateException("Unknown action: " + action);
 		}
