@@ -192,7 +192,7 @@ public class CSSMinifier extends AbstractMinifier {
 				throw new IncompleteSelectorException(selector);
 			}
 
-			this.selector = parts[0].toString().trim();
+			this.selector = parts[0].trim();
 
 			// Simplify combinators
 			this.selector = this.selector.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1");
