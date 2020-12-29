@@ -1,6 +1,7 @@
 package net.logicsquad.minifier.css;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
@@ -91,16 +92,12 @@ public class CSSMinifier extends AbstractMinifier {
 
 	@Override
 	public void minify(Writer out) {
-		try {
+		try (BufferedReader br = new BufferedReader(reader()); PrintWriter pout = new PrintWriter(out)) {
 			int k, j, // Number of open braces
 					n; // Current position in stream
 			char curr;
 
-			BufferedReader br = new BufferedReader(reader());
 			StringBuffer sb = new StringBuffer();
-
-			PrintWriter pout = new PrintWriter(out);
-
 			String s;
 			while ((s = br.readLine()) != null) {
 				if (s.trim().equals("")) {
@@ -155,7 +152,6 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 			pout.print("\r\n");
 
-			out.close();
 
 			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException ucex) {
@@ -164,6 +160,12 @@ public class CSSMinifier extends AbstractMinifier {
 			LOG.debug("Unbalanced braces!", ubex);
 		} catch (Exception ex) {
 			LOG.debug("Caught Exception in minify().", ex);
+		} finally {
+			try {
+				out.close();
+			} catch (IOException e) {
+				// TODO
+			}
 		}
 	}
 
