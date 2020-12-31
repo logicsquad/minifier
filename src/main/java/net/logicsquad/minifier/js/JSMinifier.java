@@ -6,6 +6,7 @@ import java.io.Reader;
 import java.io.Writer;
 
 import net.logicsquad.minifier.AbstractMinifier;
+import net.logicsquad.minifier.MinificationException;
 
 /**
  * Strips comments and whitespace from Javascript input.
@@ -257,7 +258,7 @@ public class JSMinifier extends AbstractMinifier {
 	 * @param writer {@link Writer} for output
 	 */
 	@Override
-	public void minify(Writer writer) {
+	public void minify(Writer writer) throws MinificationException {
 		try {
 			theA = '\n';
 			action(Action.GET, writer);
@@ -326,28 +327,28 @@ public class JSMinifier extends AbstractMinifier {
 			}
 			writer.flush();
 		} catch (Exception e) {
-			// TODO...
+			throw new MinificationException("Minification failed due to Exception.", e);
 		}
 	}
 
 	/**
 	 * Exception representing an unterminated comment.
 	 */
-	private static class UnterminatedCommentException extends Exception {
+	static class UnterminatedCommentException extends Exception {
 		private static final long serialVersionUID = 7971352218559346169L;
 	}
 
 	/**
 	 * Exception representing an unterminated string literal.
 	 */
-	private static class UnterminatedStringLiteralException extends Exception {
+	static class UnterminatedStringLiteralException extends Exception {
 		private static final long serialVersionUID = 3813645314180522143L;
 	}
 
 	/**
 	 * Exception representing an unterminated regular expression literal.
 	 */
-	private static class UnterminatedRegExpLiteralException extends Exception {
+	static class UnterminatedRegExpLiteralException extends Exception {
 		private static final long serialVersionUID = -5088088141334641219L;
 	}
 }

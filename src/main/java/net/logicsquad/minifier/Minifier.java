@@ -17,5 +17,5 @@ public interface Minifier {
 	 *
 	 * @param writer a {@link Writer}
 	 */
-	void minify(Writer writer);
+	void minify(Writer writer) throws MinificationException;
 }

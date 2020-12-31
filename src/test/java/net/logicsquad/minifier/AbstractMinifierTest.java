@@ -1,6 +1,6 @@
 package net.logicsquad.minifier;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -12,6 +12,8 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import net.logicsquad.minifier.css.CSSMinifierTest;
 
@@ -22,6 +24,11 @@ import net.logicsquad.minifier.css.CSSMinifierTest;
  * @author paulh
  */
 public abstract class AbstractMinifierTest {
+	/**
+	 * Logger
+	 */
+	private static final Logger LOG = LoggerFactory.getLogger(AbstractMinifierTest.class);
+
 	/**
 	 * Resources directory
 	 */
@@ -86,10 +93,18 @@ public abstract class AbstractMinifierTest {
 		for (String index : resources()) {
 			Writer out = new StringWriter();
 			Minifier min = miniferForReader(readerForSourceFile(index));
-			min.minify(out);
+			try {
+				min.minify(out);
+			} catch (MinificationException e) {
+				LOG.error("MinificationException with cause: {}", e.getCause().getClass().getName());
+				fail(e);
+			}
 			String expected = stringForExpectedFile(index);
 			// trim() here because there seems to be a difference in line endings
-			assertEquals(expected.trim(), out.toString().trim());
+			assertEquals(expected.trim(), out.toString().trim(), getClass().getName() + " failed on index " + index);
+		}
+		return;
+	}
 		}
 		return;
 	}

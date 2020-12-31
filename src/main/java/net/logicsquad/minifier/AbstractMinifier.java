@@ -26,7 +26,7 @@ public abstract class AbstractMinifier implements Minifier {
 	}
 
 	@Override
-	public abstract void minify(Writer writer);
+	public abstract void minify(Writer writer) throws MinificationException;
 
 	/**
 	 * Returns {@link Reader} supplying source content for this object.
