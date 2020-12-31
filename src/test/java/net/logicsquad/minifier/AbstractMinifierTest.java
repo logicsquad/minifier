@@ -105,7 +105,25 @@ public abstract class AbstractMinifierTest {
 		}
 		return;
 	}
+
+	/**
+	 * Tests that input for {@code index} throws {@code expected} {@link Exception}.
+	 * 
+	 * @param index input resource index
+	 * @param expected expected {@link Exception}
+	 * @throws IOException if there are any resource reading issues
+	 */
+	protected void throwsOnMinify(String index, Class<? extends Exception> expected) throws IOException {
+		Writer out = new StringWriter();
+		Minifier min = miniferForReader(readerForSourceFile(index));
+		try {
+			min.minify(out);
+		} catch (Exception e) {
+			assertEquals(MinificationException.class, e.getClass());
+			assertEquals(expected, e.getCause().getClass());
+			return;
 		}
+		fail("Expected: " + expected.getClass().getName());
 		return;
 	}
 }
