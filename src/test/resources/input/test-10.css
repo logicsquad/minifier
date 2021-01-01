@@ -1,0 +1,5 @@
+.someClass{  
+	background-color: green; 
+	background-size: 100% 100%;
+	background-image: url('http://www.image.com/mobile-sprite.png');  
+} 

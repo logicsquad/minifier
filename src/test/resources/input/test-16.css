@@ -1,0 +1,6 @@
+.folioViewer > .pane > .list.busy::after { 
+	animation-name: Folioviewer-listspinner; 
+	animation-duration: 0.5s; 
+	animation-iteration-count: infinite; 
+	animation-timing-function: ease-in-out; 
+} 
