@@ -53,6 +53,10 @@ dependency:
       <version>0.2</version>
     </dependency>
 
+If you're building a Maven project, and just want to minify project
+resources during the build, check out [Minifier Maven Plugin](https://github.com/logicsquad/minifier-maven-plugin),
+which uses Minifier to do the work.
+
 Contributing
 ------------
 By all means, open issue tickets and pull requests if you have something
