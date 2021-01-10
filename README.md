@@ -50,7 +50,7 @@ dependency:
     <dependency>
       <groupId>net.logicsquad</groupId>
       <artifactId>minifier</artifactId>
-      <version>0.1</version>
+      <version>0.2</version>
     </dependency>
 
 Contributing
