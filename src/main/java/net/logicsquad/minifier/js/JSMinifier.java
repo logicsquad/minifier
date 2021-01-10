@@ -256,6 +256,7 @@ public class JSMinifier extends AbstractMinifier {
 	 * </ul>
 	 *
 	 * @param writer {@link Writer} for output
+	 * @throws MinificationException if minification fails
 	 */
 	@Override
 	public void minify(Writer writer) throws MinificationException {
@@ -325,9 +326,15 @@ public class JSMinifier extends AbstractMinifier {
 					}
 				}
 			}
-			writer.flush();
-		} catch (Exception e) {
+		} catch (IOException | UnterminatedCommentException | UnterminatedRegExpLiteralException
+				| UnterminatedStringLiteralException e) {
 			throw new MinificationException("Minification failed due to Exception.", e);
+		} finally {
+			try {
+				writer.close();
+			} catch (IOException e) {
+				throw new MinificationException("Minification failed due to Exception.", e);
+			}
 		}
 	}
 

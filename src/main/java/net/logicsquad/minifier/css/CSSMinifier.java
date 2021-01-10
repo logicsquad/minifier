@@ -10,12 +10,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.logicsquad.minifier.AbstractMinifier;
+import net.logicsquad.minifier.MinificationException;
 
 /**
  * Strips comments and whitespace from CSS input.
@@ -90,9 +90,15 @@ public class CSSMinifier extends AbstractMinifier {
 		super(reader);
 	}
 
+	/**
+	 * Copies from input to {@code writer}, minifying CSS content.
+	 * 
+	 * @param writer {@link Writer} for output
+	 * @throws MinificationException if minification fails
+	 */
 	@Override
-	public void minify(Writer out) {
-		try (BufferedReader br = new BufferedReader(reader()); PrintWriter pout = new PrintWriter(out)) {
+	public void minify(Writer writer) throws MinificationException {
+		try (BufferedReader br = new BufferedReader(reader()); PrintWriter pout = new PrintWriter(writer)) {
 			int k, j, // Number of open braces
 					n; // Current position in stream
 			char curr;
@@ -151,20 +157,15 @@ public class CSSMinifier extends AbstractMinifier {
 				pout.print(selector.toString());
 			}
 			pout.print("\r\n");
-
-
 			LOG.debug("Process completed successfully.");
-		} catch (UnterminatedCommentException ucex) {
-			LOG.debug("Unterminated comment!", ucex);
-		} catch (UnbalancedBracesException ubex) {
-			LOG.debug("Unbalanced braces!", ubex);
-		} catch (Exception ex) {
-			LOG.debug("Caught Exception in minify().", ex);
+		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
+				| IOException e) {
+			throw new MinificationException("Minification failed due to Exception.", e);
 		} finally {
 			try {
-				out.close();
+				writer.close();
 			} catch (IOException e) {
-				// TODO
+				throw new MinificationException("Minification failed due to Exception.", e);
 			}
 		}
 	}
@@ -324,45 +325,38 @@ public class CSSMinifier extends AbstractMinifier {
 		 * @throws Exception If the property is incomplete and cannot be parsed.
 		 */
 		public Property(String property) throws IncompletePropertyException {
-			try {
-				// Parse the property.
-				ArrayList<String> parts = new ArrayList<String>();
-				boolean bCanSplit = true;
-				int j = 0;
-				String substr;
-				LOG.debug("\t\tExamining property: {}", property);
-				for (int i = 0; i < property.length(); i++) {
-					if (!bCanSplit) { // If we're inside a string
-						bCanSplit = (property.charAt(i) == '"');
-					} else if (property.charAt(i) == '"') {
-						bCanSplit = false;
-					} else if (property.charAt(i) == ':' && parts.size() < 1) {
-						substr = property.substring(j, i);
-						if (!(substr.trim().equals("") || (substr == null))) {
-							parts.add(substr);
-						}
-						j = i + 1;
+			ArrayList<String> parts = new ArrayList<String>();
+			boolean bCanSplit = true;
+			int j = 0;
+			String substr;
+			LOG.debug("\t\tExamining property: {}", property);
+			for (int i = 0; i < property.length(); i++) {
+				if (!bCanSplit) { // If we're inside a string
+					bCanSplit = (property.charAt(i) == '"');
+				} else if (property.charAt(i) == '"') {
+					bCanSplit = false;
+				} else if (property.charAt(i) == ':' && parts.size() < 1) {
+					substr = property.substring(j, i);
+					if (!(substr.trim().equals("") || (substr == null))) {
+						parts.add(substr);
 					}
+					j = i + 1;
 				}
-				substr = property.substring(j, property.length());
-				if (!substr.trim().equals("")) {
-					parts.add(substr);
-				}
-				if (parts.size() < 2) {
-					throw new IncompletePropertyException(property);
-				}
-
-				String prop = parts.get(0).trim();
-				if (!(prop.length() > 2 && prop.substring(0, 2).equals("--"))) {
-					prop = prop.toLowerCase();
-				}
-				this.property = prop;
-
-				this.parts = parseValues(simplifyColours(parts.get(1).trim().replaceAll(", ", ",")));
-
-			} catch (PatternSyntaxException e) {
-				// Invalid regular expression used.
 			}
+			substr = property.substring(j, property.length());
+			if (!substr.trim().equals("")) {
+				parts.add(substr);
+			}
+			if (parts.size() < 2) {
+				throw new IncompletePropertyException(property);
+			}
+
+			String prop = parts.get(0).trim();
+			if (!(prop.length() > 2 && prop.substring(0, 2).equals("--"))) {
+				prop = prop.toLowerCase();
+			}
+			this.property = prop;
+			this.parts = parseValues(simplifyColours(parts.get(1).trim().replaceAll(", ", ",")));
 		}
 
 		/**

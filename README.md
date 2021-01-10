@@ -13,6 +13,51 @@ to provide _reasonable_ file size reduction in most cases.
 
 At launch, we will provide classes to minify Javascript and CSS.
 
+Getting started
+---------------
+There are two minifier classes:
+
+* `CSSMinifier` for CSS; and
+* `JSMinifier` for Javascript.
+
+They both implement `Minifier`, which declares a single method:
+
+    void minify(Writer writer) throws MinificationException;
+
+Further, they both extend `AbstractMinifier`, which provides a
+constructor taking a `Reader` object. So you need a `Reader` and a
+`Writer` to minify a resource, and that's it. For example:
+
+    Reader input = new FileReader("basic.css");
+    Writer output = new FileWriter("basic-min.css");
+    Minifier min = new CSSMinifier(input);
+    try {
+        min.minify(output);
+    } catch (MinificationException e) {
+        // Handle exception
+    }
+
+And that's it. A `MinificationException` will usually wrap some _other_
+exception, such as `CSSMinifier.UnterminatedCommentException`. If you
+need to know why minification failed, you can call `getCause()` on the
+exception you catch.
+
+Using Minifier
+--------------
+You can use Minifier in your projects by including it as a Maven
+dependency:
+
+    <dependency>
+      <groupId>net.logicsquad</groupId>
+      <artifactId>minifier</artifactId>
+      <version>0.2</version>
+    </dependency>
+
+Contributing
+------------
+By all means, open issue tickets and pull requests if you have something
+to contribute.
+
 References
 ----------
 Javascript minification is based on Douglas Crockford's [original
