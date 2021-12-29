@@ -50,8 +50,12 @@ dependency:
     <dependency>
       <groupId>net.logicsquad</groupId>
       <artifactId>minifier</artifactId>
-      <version>0.2</version>
+      <version>1.0</version>
     </dependency>
+
+If you're building a Maven project, and just want to minify project
+resources during the build, check out [Minifier Maven Plugin](https://github.com/logicsquad/minifier-maven-plugin),
+which uses Minifier to do the work.
 
 Contributing
 ------------
