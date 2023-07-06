@@ -3,6 +3,16 @@
 The format here is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1] - 2023-07-06
+### Changed
+- Updated some dependency versions (Surefire, JUnit).
+ 
+### Fixed
+- Changed `log4j-slf4j-impl` → `slf4j-api` (but adds
+  `log4j-slf4j2-impl` for unit tests).
+- Fixed issue with over-eager property truncation, leading to
+  occasional invalid CSS.
+
 ## [1.0] - 2021-12-29
 ### Changed
 - Updated some dependency versions.
