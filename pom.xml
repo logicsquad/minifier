@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.logicsquad</groupId>
   <artifactId>minifier</artifactId>
-  <version>1.0</version>
+  <version>1.1</version>
   <name>Minifier</name>
   <description>Java-based minification for web resources.</description>
   <url>https://github.com/logicsquad/minifier</url>
@@ -193,7 +193,7 @@
     <plugins>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0-M5</version>
+        <version>3.1.2</version>
         <executions>
           <execution>
             <id>default-test</id>
@@ -300,16 +300,33 @@
     </plugins>
   </reporting>
 
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>5.9.1</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>2.0.6</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
-      <version>2.17.1</version>
+      <artifactId>log4j-slf4j2-impl</artifactId>
+      <version>2.20.0</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-      <version>5.8.2</version>
+      <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
