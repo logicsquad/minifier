@@ -1,1 +1,1 @@
-:root{--mYcolor:#000}.folioViewer>.pane>.list.busy::after{color:var(--mYcolor)}.folioViewer>.pane>.list.busy::after{animation-duration:0.5s;animation-iteration-count:infinite;animation-name:Folioviewer-listspinner;animation-timing-function:ease-in-out}
+:root{--mYcolor:#000}.folioViewer>.pane>.list.busy::after{color:var( --mYcolor)}.folioViewer>.pane>.list.busy::after{animation-duration:0.5s;animation-iteration-count:infinite;animation-name:Folioviewer-listspinner;animation-timing-function:ease-in-out}

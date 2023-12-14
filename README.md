@@ -50,7 +50,7 @@ dependency:
     <dependency>
       <groupId>net.logicsquad</groupId>
       <artifactId>minifier</artifactId>
-      <version>1.1</version>
+      <version>1.2</version>
     </dependency>
 
 If you're building a Maven project, and just want to minify project
