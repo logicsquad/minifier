@@ -586,7 +586,9 @@ public class CSSMinifier extends AbstractMinifier {
 			if ((this.contents.length() > 4) && (this.contents.substring(0, 4).equalsIgnoreCase("url("))) {
 				this.contents = this.contents.replaceAll("(?i)url\\(('|\")?(.*?)\\1\\)", "url($2)");
 			} else if ((this.contents.length() > 4) && (this.contents.substring(0, 4).equalsIgnoreCase("var("))) {
-				this.contents = this.contents.replaceAll("\\s", "");
+				// We can't just remove all whitespace in the line, but we can ensure there's a maximum of one space in any run.
+				// https://github.com/logicsquad/minifier/issues/5
+				this.contents = this.contents.replaceAll("\\s{2,}", " ").trim();
 			} else {
 				String[] words = this.contents.split("\\s");
 				if (words.length == 1) {
