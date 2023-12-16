@@ -116,7 +116,9 @@ public class CSSMinifier extends AbstractMinifier {
 			// Find the start of the comment
 			n = 0;
 			while ((n = sb.indexOf("/*", n)) != -1) {
-				if (sb.charAt(n + 2) == '*') { // Retain special comments
+				// Here we retain "Javadoc-style" comments. We're looking for "/**", but need to exclude "/**/".
+				// https://github.com/logicsquad/minifier/issues/4
+				if (sb.charAt(n + 2) == '*' && sb.charAt(n + 3) != '/') {
 					n += 2;
 					continue;
 				}
