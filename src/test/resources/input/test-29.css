@@ -1,0 +1,5 @@
+@charset "UTF-8";
+#test-29 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
