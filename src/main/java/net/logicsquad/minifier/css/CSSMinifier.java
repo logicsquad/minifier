@@ -533,7 +533,8 @@ public class CSSMinifier extends AbstractMinifier {
 
 		private void simplifyParameters() {
 			if (this.property.equals("background-size") || this.property.equals("quotes")
-					|| this.property.equals("transform-origin"))
+					|| this.property.equals("transform-origin") || this.property.equals("grid-template-columns")
+					|| this.property.equals("grid-template-rows"))
 				return;
 
 			StringBuffer newContents = new StringBuffer();
