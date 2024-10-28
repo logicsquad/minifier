@@ -116,7 +116,9 @@ public class CSSMinifier extends AbstractMinifier {
 			// Find the start of the comment
 			n = 0;
 			while ((n = sb.indexOf("/*", n)) != -1) {
-				if (sb.charAt(n + 2) == '*') { // Retain special comments
+				// Here we retain "Javadoc-style" comments. We're looking for "/**", but need to exclude "/**/".
+				// https://github.com/logicsquad/minifier/issues/4
+				if (sb.charAt(n + 2) == '*' && sb.charAt(n + 3) != '/') {
 					n += 2;
 					continue;
 				}
@@ -531,7 +533,8 @@ public class CSSMinifier extends AbstractMinifier {
 
 		private void simplifyParameters() {
 			if (this.property.equals("background-size") || this.property.equals("quotes")
-					|| this.property.equals("transform-origin"))
+					|| this.property.equals("transform-origin") || this.property.equals("grid-template-columns")
+					|| this.property.equals("grid-template-rows"))
 				return;
 
 			StringBuffer newContents = new StringBuffer();
