@@ -9,6 +9,7 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -18,8 +19,7 @@ import org.slf4j.LoggerFactory;
 import net.logicsquad.minifier.css.CSSMinifierTest;
 
 /**
- * Parent class for tests that compare results from known input to expected
- * output.
+ * Parent class for tests that compare results from known input to expected output.
  *
  * @author paulh
  */
@@ -42,14 +42,23 @@ public abstract class AbstractMinifierTest {
 	protected abstract String extension();
 
 	/**
+	 * Returns a {@link Reader} for {@code filename}.
+	 * 
+	 * @param filename a resource filename
+	 * @return {@link Reader}
+	 */
+	protected Reader readerForSourceFile(String filename) {
+		return new InputStreamReader(CSSMinifierTest.class.getClassLoader().getResourceAsStream(filename));
+	}
+
+	/**
 	 * Returns a {@link Reader} for source file with "index" {@code index}.
 	 *
 	 * @param index source file index
 	 * @return {@link Reader}
 	 */
-	protected Reader readerForSourceFile(String index) {
-		String sourceFile = "input/test-" + index + "." + extension();
-		return new InputStreamReader(CSSMinifierTest.class.getClassLoader().getResourceAsStream(sourceFile));
+	protected Reader readerForIndex(String index) {
+		return readerForSourceFile("input/test-" + index + "." + extension());
 	}
 
 	/**
@@ -75,12 +84,25 @@ public abstract class AbstractMinifierTest {
 	protected abstract Minifier miniferForReader(Reader reader);
 
 	/**
+	 * Returns count of test resources for subclass.
+	 * 
+	 * @return count of test resources
+	 */
+	protected abstract int resourceCount();
+
+	/**
 	 * Returns a list of filename "indexes" that will be used to construct the input
 	 * and expected output filenames.
 	 *
 	 * @return list of filename "indexes"
 	 */
-	protected abstract List<String> resources();
+	protected List<String> resources() {
+		List<String> result = new ArrayList<>();
+		for (int i = 1; i <= resourceCount(); i++) {
+			result.add(String.format("%02d", i));
+		}
+		return result;
+	}
 
 	/**
 	 * Loops over all filenames that can be constructed, reads in the source
@@ -92,7 +114,7 @@ public abstract class AbstractMinifierTest {
 	public void actualOutputMatchesExpected() throws IOException {
 		for (String index : resources()) {
 			Writer out = new StringWriter();
-			Minifier min = miniferForReader(readerForSourceFile(index));
+			Minifier min = miniferForReader(readerForIndex(index));
 			try {
 				min.minify(out);
 			} catch (MinificationException e) {
@@ -113,9 +135,9 @@ public abstract class AbstractMinifierTest {
 	 * @param expected expected {@link Exception}
 	 * @throws IOException if there are any resource reading issues
 	 */
-	protected void throwsOnMinify(String index, Class<? extends Exception> expected) throws IOException {
+	protected void throwsOnMinify(String filename, Class<? extends Exception> expected) throws IOException {
 		Writer out = new StringWriter();
-		Minifier min = miniferForReader(readerForSourceFile(index));
+		Minifier min = miniferForReader(readerForSourceFile(filename));
 		try {
 			min.minify(out);
 		} catch (Exception e) {
