@@ -189,46 +189,122 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		public Selector(String selector)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
-			String[] parts = selector.split("\\{"); // We have to escape the { with a \ for the regex, which itself requires
-													// escaping for the string. Sigh.
-			if (parts.length < 2) {
+			int brace = selector.indexOf('{');
+			if (brace < 0) {
 				throw new IncompleteSelectorException(selector);
 			}
+			String body = selector.substring(brace + 1).trim();
+			// The body must be brace-terminated, and must contain more than just "}".
+			if (body.isEmpty() || body.charAt(body.length() - 1) != '}') {
+				throw new UnterminatedSelectorException(selector);
+			}
+			if (body.length() == 1) {
+				throw new EmptySelectorBodyException(selector);
+			}
+			LOG.debug("Parsing selector: {}", selector.substring(0, brace).trim());
+			init(selector.substring(0, brace), body.substring(0, body.length() - 1));
+		}
 
-			this.selector = parts[0].trim();
+		/**
+		 * Creates a new Selector from a pre-split header and body. Used when recursing
+		 * into nested rules, where the surrounding braces have already been stripped.
+		 *
+		 * @param header the selector text, for example "div" or "@media screen"
+		 * @param body   the selector body, without its enclosing braces
+		 * @throws IncompleteSelectorException  if a nested selector cannot be parsed
+		 * @throws UnterminatedSelectorException if a nested selector is unterminated
+		 * @throws EmptySelectorBodyException   if a nested selector has an empty body
+		 */
+		private Selector(String header, String body)
+				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
+			init(header, body);
+		}
 
-			// Simplify combinators
-			this.selector = this.selector.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1");
-
-			// We're dealing with a nested property, eg @-webkit-keyframes
-			if (parts.length > 2) {
-				this.subSelectors = new ArrayList<>();
-				parts = selector.split("(\\s*\\{\\s*)|(\\s*\\}\\s*)");
-				for (int i = 1; i < parts.length; i += 2) {
-					parts[i] = parts[i].trim();
-					parts[i + 1] = parts[i + 1].trim();
-					if (!(parts[i].equals("") || (parts[i + 1].equals("")))) {
-						this.subSelectors.add(new Selector(parts[i] + "{" + parts[i + 1] + "}"));
+		/**
+		 * Initialises this Selector from its (raw) header and its body, parsing the
+		 * body into nested selectors and/or properties. Handles arbitrarily deep CSS
+		 * nesting via recursion.
+		 *
+		 * @param header the raw selector text
+		 * @param body   the selector body, without its enclosing braces
+		 */
+		private void init(String header, String body)
+				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
+			this.selector = header.trim().replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1");
+			body = body.trim();
+			// Drop a single trailing semicolon so the final declaration parses cleanly.
+			if (body.endsWith(";")) {
+				body = body.substring(0, body.length() - 1);
+			}
+			this.subSelectors = new ArrayList<>();
+			List<Property> props = new ArrayList<>();
+			StringBuilder pending = new StringBuilder();
+			boolean inString = false, inUrl = false;
+			int i = 0;
+			while (i < body.length()) {
+				char c = body.charAt(i);
+				if (inString) {
+					inString = c != '"';
+					pending.append(c);
+					i++;
+				} else if (inUrl) {
+					inUrl = c != ')';
+					pending.append(c);
+					i++;
+				} else if (c == '"') {
+					inString = true;
+					pending.append(c);
+					i++;
+				} else if (c == '(' && i >= 3 && "url".equalsIgnoreCase(body.substring(i - 3, i))) {
+					inUrl = true;
+					pending.append(c);
+					i++;
+				} else if (c == '{') {
+					// A nested rule starts here. Declarations were flushed at their ';',
+					// so "pending" now holds only this nested selector's header.
+					int depth = 1, j = i + 1;
+					while (j < body.length() && depth > 0) {
+						char d = body.charAt(j++);
+						if (d == '{') {
+							depth++;
+						} else if (d == '}') {
+							depth--;
+						}
 					}
+					this.subSelectors.add(new Selector(pending.toString(), body.substring(i + 1, j - 1)));
+					pending.setLength(0);
+					i = j;
+				} else if (c == ';') {
+					addProperty(props, pending.toString());
+					pending.setLength(0);
+					i++;
+				} else {
+					pending.append(c);
+					i++;
 				}
-			} else {
-				String contents = parts[parts.length - 1].trim();
-				LOG.debug("Parsing selector: {}", this.selector);
-				LOG.debug("\t{}", contents);
-				if (contents.charAt(contents.length() - 1) != '}') { // Ensure that we have a leading and trailing brace.
-					throw new UnterminatedSelectorException(selector);
-				}
-				if (contents.length() == 1) {
-					throw new EmptySelectorBodyException(selector);
-				}
-				contents = contents.substring(0, contents.length() - 1);
-				if (contents.charAt(contents.length() - 1) == ';') {
-					contents = contents.substring(0, contents.length() - 1);
-				}
+			}
+			// A trailing declaration with no terminating semicolon.
+			addProperty(props, pending.toString());
+			this.properties = props.toArray(new Property[0]);
+			sortProperties(this.properties);
+		}
 
-				this.properties = new Property[0];
-				this.properties = parseProperties(contents).toArray(this.properties);
-				sortProperties(this.properties);
+		/**
+		 * Parses {@code declaration} as a {@link Property} and adds it to
+		 * {@code props}. Blank declarations are ignored, and incomplete ones are
+		 * logged and skipped.
+		 *
+		 * @param props       list to add the parsed property to
+		 * @param declaration a single "name: value" declaration
+		 */
+		private void addProperty(List<Property> props, String declaration) {
+			if (declaration.trim().isEmpty()) {
+				return;
+			}
+			try {
+				props.add(new Property(declaration));
+			} catch (IncompletePropertyException ipex) {
+				LOG.debug("Incomplete property in selector '{}': {}", selector, ipex.getMessage());
 			}
 		}
 
@@ -256,52 +332,6 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 			sb.append("}");
 			return sb.toString();
-		}
-
-		/**
-		 * Parses out the properties of a selector's body.
-		 *
-		 * @param contents The body; for example, "border: solid 1px red; color: blue;"
-		 * @returns An array of properties parsed from this selector.
-		 */
-		private ArrayList<Property> parseProperties(String contents) {
-			List<String> parts = new ArrayList<>();
-			boolean bInsideString = false, bInsideURL = false;
-			int j = 0;
-			String substr;
-			for (int i = 0; i < contents.length(); i++) {
-				if (bInsideString) { // If we're inside a string
-					bInsideString = !(contents.charAt(i) == '"');
-				} else if (bInsideURL) { // If we're inside a URL
-					bInsideURL = !(contents.charAt(i) == ')');
-				} else if (contents.charAt(i) == '"') {
-					bInsideString = true;
-				} else if (contents.charAt(i) == '(') {
-					if ((i - 3) > 0 && "url".equals(contents.substring(i - 3, i)))
-						bInsideURL = true;
-				} else if (contents.charAt(i) == ';') {
-					substr = contents.substring(j, i);
-					if (!(substr.trim().equals("") || (substr == null))) {
-						parts.add(substr);
-					}
-					j = i + 1;
-				}
-			}
-			substr = contents.substring(j, contents.length());
-			if (!substr.trim().equals("")) {
-				parts.add(substr);
-			}
-
-			ArrayList<Property> results = new ArrayList<Property>();
-			for (int i = 0; i < parts.size(); i++) {
-				try {
-					results.add(new Property(parts.get(i)));
-				} catch (IncompletePropertyException ipex) {
-					LOG.debug("Incomplete property in selector '{}': {}", selector, ipex.getMessage());
-				}
-			}
-
-			return results;
 		}
 
 		/**
