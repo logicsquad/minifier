@@ -14,7 +14,7 @@ public class CSSMinifierTest extends AbstractMinifierTest {
 	/**
 	 * Count of input/output resources
 	 */
-	private static final int RESOURCE_COUNT = 29;
+	private static final int RESOURCE_COUNT = 30;
 
 	/**
 	 * Extension for resource files
