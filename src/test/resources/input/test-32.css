@@ -1,0 +1,5 @@
+.nav > li {
+    margin: 0px;
+    padding: 0em 10px;
+    display: block !important;
+}
