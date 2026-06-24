@@ -17,8 +17,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
-import net.logicsquad.minifier.css.CSSMinifierTest;
-
 /**
  * Parent class for tests that compare results from known input to expected output.
  *
@@ -44,7 +42,7 @@ public abstract class AbstractMinifierTest {
 	 * @return {@link Reader}
 	 */
 	protected Reader readerForSourceFile(String filename) {
-		return new InputStreamReader(CSSMinifierTest.class.getClassLoader().getResourceAsStream(filename));
+		return new InputStreamReader(getClass().getClassLoader().getResourceAsStream(filename));
 	}
 
 	/**
@@ -124,7 +122,7 @@ public abstract class AbstractMinifierTest {
 			assertEquals(expected, e.getCause().getClass());
 			return;
 		}
-		fail("Expected: " + expected.getClass().getName());
+		fail("Expected: " + expected.getName());
 		return;
 	}
 }
