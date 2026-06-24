@@ -12,11 +12,6 @@ import net.logicsquad.minifier.Minifier;
  */
 public class CSSMinifierTest extends AbstractMinifierTest {
 	/**
-	 * Count of input/output resources
-	 */
-	private static final int RESOURCE_COUNT = 30;
-
-	/**
 	 * Extension for resource files
 	 */
 	private static final String EXTENSION = "css";
@@ -29,10 +24,5 @@ public class CSSMinifierTest extends AbstractMinifierTest {
 	@Override
 	protected Minifier miniferForReader(Reader reader) {
 		return new CSSMinifier(reader);
-	}
-
-	@Override
-	protected int resourceCount() {
-		return RESOURCE_COUNT;
 	}
 }

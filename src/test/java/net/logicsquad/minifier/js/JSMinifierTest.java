@@ -15,11 +15,6 @@ import net.logicsquad.minifier.Minifier;
  */
 public class JSMinifierTest extends AbstractMinifierTest {
 	/**
-	 * Count of input/output resources
-	 */
-	private static final int RESOURCE_COUNT = 24;
-
-	/**
 	 * Extension for resource files
 	 */
 	private static final String EXTENSION = "js";
@@ -38,10 +33,5 @@ public class JSMinifierTest extends AbstractMinifierTest {
 	public void unterminatedCommentThrowsException() throws IOException {
 		throwsOnMinify("exceptions/unterminated-comment.js", JSMinifier.UnterminatedCommentException.class);
 		return;
-	}
-
-	@Override
-	protected int resourceCount() {
-		return RESOURCE_COUNT;
 	}
 }
