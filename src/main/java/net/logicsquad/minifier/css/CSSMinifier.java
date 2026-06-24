@@ -403,7 +403,9 @@ public class CSSMinifier extends AbstractMinifier {
 			StringBuffer sb = new StringBuffer();
 			sb.append(this.property).append(":");
 			for (Part p : this.parts) {
-				sb.append(p.toString()).append(",");
+				if (p != null) {
+					sb.append(p.toString()).append(",");
+				}
 			}
 			sb.deleteCharAt(sb.length() - 1); // Delete the trailing comma.
 			sb.append(";");
@@ -444,18 +446,19 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		private Part[] parseValues(String contents) {
 			String[] parts = contents.split(",");
-			Part[] results = new Part[parts.length];
+			List<Part> results = new ArrayList<>(parts.length);
 
 			for (int i = 0; i < parts.length; i++) {
 				try {
-					results[i] = new Part(parts[i], property);
+					results.add(new Part(parts[i], property));
 				} catch (Exception e) {
+					// Drop a part we can't parse rather than retaining a null, which
+					// toString() would later dereference.
 					LOG.debug("Exception in parseValues().", e);
-					results[i] = null;
 				}
 			}
 
-			return results;
+			return results.toArray(new Part[0]);
 		}
 
 		private String simplifyColours(String contents) {
