@@ -482,12 +482,20 @@ public class CSSMinifier extends AbstractMinifier {
 			while (matcher.find()) {
 				hexColour = new StringBuffer("#");
 				rgbColours = matcher.group(1).split(",");
-				for (int i = 0; i < rgbColours.length; i++) {
-					colourValue = Integer.parseInt(rgbColours[i]);
-					if (colourValue < 16) {
-						hexColour.append("0");
+				try {
+					for (int i = 0; i < rgbColours.length; i++) {
+						colourValue = Integer.parseInt(rgbColours[i]);
+						if (colourValue < 16) {
+							hexColour.append("0");
+						}
+						hexColour.append(Integer.toHexString(colourValue));
 					}
-					hexColour.append(Integer.toHexString(colourValue));
+				} catch (NumberFormatException e) {
+					// A component is out of int range (or otherwise unparseable). Leave this
+					// colour untouched rather than aborting minification, consistent with how
+					// non-numeric rgb() values are left alone.
+					matcher.appendReplacement(newContents, Matcher.quoteReplacement(matcher.group()));
+					continue;
 				}
 				matcher.appendReplacement(newContents, hexColour.toString());
 			}
