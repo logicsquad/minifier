@@ -743,7 +743,23 @@ public class CSSMinifier extends AbstractMinifier {
 		private void simplifyQuotesAndCaps() {
 			// Strip quotes from URLs
 			if ((this.contents.length() > 4) && (this.contents.substring(0, 4).equalsIgnoreCase("url("))) {
-				this.contents = this.contents.replaceAll("(?i)url\\(('|\")?(.*?)\\1\\)", "url($2)");
+				// Only strip the quotes when the unquoted form is equivalent. A URL whose
+				// content contains whitespace, parentheses, quotes or a backslash must keep
+				// its quotes to remain valid.
+				Matcher matcher = Pattern.compile("(?i)url\\(('|\")?(.*?)\\1\\)").matcher(this.contents);
+				StringBuffer sb = new StringBuffer();
+				while (matcher.find()) {
+					String inner = matcher.group(2);
+					String replacement;
+					if (matcher.group(1) != null && Pattern.compile("[\\s\"'()\\\\]").matcher(inner).find()) {
+						replacement = matcher.group(); // quotes are required; leave untouched
+					} else {
+						replacement = "url(" + inner + ")";
+					}
+					matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+				}
+				matcher.appendTail(sb);
+				this.contents = sb.toString();
 			} else if ((this.contents.length() > 4) && (this.contents.substring(0, 4).equalsIgnoreCase("var("))) {
 				// We can't just remove all whitespace in the line, but we can ensure there's a maximum of one space in any run.
 				// https://github.com/logicsquad/minifier/issues/5
