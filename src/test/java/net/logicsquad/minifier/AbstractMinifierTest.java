@@ -70,7 +70,7 @@ public abstract class AbstractMinifierTest {
 	 * @throws IOException if file can't be read
 	 */
 	protected String stringForExpectedFile(String index) throws IOException {
-		String expectedFile = "output/test-" + index + "." + extension();
+		String expectedFile = "expected/test-" + index + "." + extension();
 		return new String(Files.readAllBytes(Paths.get(RESOURCES_DIR, expectedFile)));
 	}
 
