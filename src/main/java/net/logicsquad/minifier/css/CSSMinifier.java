@@ -130,28 +130,39 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 			LOG.debug("Parsing and processing selectors...");
 			List<Selector> selectors = new ArrayList<>();
+			// Scan for top-level rules, skipping strings and url() tokens so that braces
+			// inside them are not mistaken for rule boundaries.
+			String css = sb.toString();
 			n = 0;
 			j = 0;
-			k = 0;
-			for (int i = 0; i < sb.length(); i++) {
-				curr = sb.charAt(i);
-				if (j < 0) {
-					throw new UnbalancedBracesException();
-				}
-				if (curr == '{') {
+			int i = 0;
+			while (i < css.length()) {
+				curr = css.charAt(i);
+				if (curr == '"' || curr == '\'') {
+					i = Selector.consumeString(css, i, null);
+				} else if (Selector.isUrlStart(css, i)) {
+					i = Selector.consumeUrl(css, i, null);
+				} else if (curr == '{') {
 					j++;
+					i++;
 				} else if (curr == '}') {
 					j--;
+					i++;
+					if (j < 0) {
+						throw new UnbalancedBracesException();
+					}
 					if (j == 0) {
 						try {
-							selectors.add(new Selector(sb.substring(n, i + 1)));
+							selectors.add(new Selector(css.substring(n, i)));
 						} catch (UnterminatedSelectorException usex) {
 							LOG.debug("Unterminated selector: {}", usex.getMessage());
 						} catch (EmptySelectorBodyException ebex) {
 							LOG.debug("Empty selector body: {}", ebex.getMessage());
 						}
-						n = i + 1;
+						n = i;
 					}
+				} else {
+					i++;
 				}
 			}
 
@@ -239,38 +250,21 @@ public class CSSMinifier extends AbstractMinifier {
 			this.subSelectors = new ArrayList<>();
 			List<Property> props = new ArrayList<>();
 			StringBuilder pending = new StringBuilder();
-			boolean inString = false, inUrl = false;
 			int i = 0;
 			while (i < body.length()) {
 				char c = body.charAt(i);
-				if (inString) {
-					inString = c != '"';
-					pending.append(c);
-					i++;
-				} else if (inUrl) {
-					inUrl = c != ')';
-					pending.append(c);
-					i++;
-				} else if (c == '"') {
-					inString = true;
-					pending.append(c);
-					i++;
-				} else if (c == '(' && i >= 3 && "url".equalsIgnoreCase(body.substring(i - 3, i))) {
-					inUrl = true;
-					pending.append(c);
-					i++;
+				if (c == '"' || c == '\'') {
+					// A string: consume it whole so that ';', '{' or '}' inside it are
+					// not mistaken for boundaries.
+					i = consumeString(body, i, pending);
+				} else if (isUrlStart(body, i)) {
+					// A url(...) token: consume it whole, skipping strings within it so a
+					// ')' inside a quoted URL doesn't close it early.
+					i = consumeUrl(body, i, pending);
 				} else if (c == '{') {
 					// A nested rule starts here. Declarations were flushed at their ';',
 					// so "pending" now holds only this nested selector's header.
-					int depth = 1, j = i + 1;
-					while (j < body.length() && depth > 0) {
-						char d = body.charAt(j++);
-						if (d == '{') {
-							depth++;
-						} else if (d == '}') {
-							depth--;
-						}
-					}
+					int j = matchingBrace(body, i);
 					this.subSelectors.add(new Selector(pending.toString(), body.substring(i + 1, j - 1)));
 					pending.setLength(0);
 					i = j;
@@ -287,6 +281,127 @@ public class CSSMinifier extends AbstractMinifier {
 			addProperty(props, pending.toString());
 			this.properties = props.toArray(new Property[0]);
 			sortProperties(this.properties);
+		}
+
+		/**
+		 * Consumes a quoted string starting at {@code i} (the opening quote), appending
+		 * the consumed characters to {@code sb} (which may be {@code null} to skip
+		 * without collecting). Backslash escapes are honoured, so an escaped quote does
+		 * not terminate the string.
+		 *
+		 * @param s  the string being scanned
+		 * @param i  index of the opening quote
+		 * @param sb buffer to append consumed characters to, or {@code null}
+		 * @return the index just past the closing quote, or the length of {@code s} if
+		 *         the string is unterminated
+		 */
+		private static int consumeString(String s, int i, StringBuilder sb) {
+			char quote = s.charAt(i);
+			if (sb != null) {
+				sb.append(quote);
+			}
+			i++;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (sb != null) {
+					sb.append(c);
+				}
+				i++;
+				if (c == '\\' && i < s.length()) {
+					if (sb != null) {
+						sb.append(s.charAt(i)); // escaped character, taken verbatim
+					}
+					i++;
+				} else if (c == quote) {
+					break;
+				}
+			}
+			return i;
+		}
+
+		/**
+		 * Returns {@code true} if a {@code url(} function token begins at {@code i}
+		 * (case-insensitive) and is not part of a longer identifier.
+		 *
+		 * @param s the string being scanned
+		 * @param i candidate index
+		 * @return whether a {@code url(} token starts at {@code i}
+		 */
+		private static boolean isUrlStart(String s, int i) {
+			if (!s.regionMatches(true, i, "url(", 0, 4)) {
+				return false;
+			}
+			if (i > 0) {
+				char prev = s.charAt(i - 1);
+				if (Character.isLetterOrDigit(prev) || prev == '-' || prev == '_') {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		/**
+		 * Consumes a {@code url(...)} token starting at {@code i} (the {@code u}),
+		 * appending the consumed characters to {@code sb} (which may be {@code null} to
+		 * skip without collecting). Quoted strings within the URL are skipped whole, so
+		 * a {@code )} inside such a string does not terminate the URL.
+		 *
+		 * @param s  the string being scanned
+		 * @param i  index of the leading {@code u} of {@code url(}
+		 * @param sb buffer to append consumed characters to, or {@code null}
+		 * @return the index just past the closing {@code )}, or the length of {@code s}
+		 *         if the URL is unterminated
+		 */
+		private static int consumeUrl(String s, int i, StringBuilder sb) {
+			if (sb != null) {
+				sb.append(s, i, i + 4); // "url("
+			}
+			i += 4;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = consumeString(s, i, sb);
+				} else {
+					if (sb != null) {
+						sb.append(c);
+					}
+					i++;
+					if (c == ')') {
+						break;
+					}
+				}
+			}
+			return i;
+		}
+
+		/**
+		 * Given {@code i} pointing at an opening brace, returns the index just past the
+		 * matching closing brace. Braces inside strings and {@code url()} tokens are
+		 * ignored.
+		 *
+		 * @param s the string being scanned
+		 * @param i index of the opening brace
+		 * @return the index just past the matching closing brace, or the length of
+		 *         {@code s} if unbalanced
+		 */
+		private static int matchingBrace(String s, int i) {
+			int depth = 0;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = consumeString(s, i, null);
+				} else if (isUrlStart(s, i)) {
+					i = consumeUrl(s, i, null);
+				} else {
+					i++;
+					if (c == '{') {
+						depth++;
+					} else if (c == '}' && --depth == 0) {
+						return i;
+					}
+				}
+			}
+			return i;
 		}
 
 		/**
