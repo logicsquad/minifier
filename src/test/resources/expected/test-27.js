@@ -1,0 +1,1 @@
+function collapse(s){return s.replace(/\s+/g," ");}

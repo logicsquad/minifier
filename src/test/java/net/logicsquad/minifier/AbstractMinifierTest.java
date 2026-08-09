@@ -8,27 +8,21 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import net.logicsquad.minifier.css.CSSMinifierTest;
+import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.TestFactory;
 
 /**
- * Parent class for tests that compare results from known input to expected
- * output.
+ * Parent class for tests that compare results from known input to expected output.
  *
  * @author paulh
  */
 public abstract class AbstractMinifierTest {
-	/**
-	 * Logger
-	 */
-	private static final Logger LOG = LoggerFactory.getLogger(AbstractMinifierTest.class);
-
 	/**
 	 * Resources directory
 	 */
@@ -42,14 +36,23 @@ public abstract class AbstractMinifierTest {
 	protected abstract String extension();
 
 	/**
+	 * Returns a {@link Reader} for {@code filename}.
+	 * 
+	 * @param filename a resource filename
+	 * @return {@link Reader}
+	 */
+	protected Reader readerForSourceFile(String filename) {
+		return new InputStreamReader(getClass().getClassLoader().getResourceAsStream(filename));
+	}
+
+	/**
 	 * Returns a {@link Reader} for source file with "index" {@code index}.
 	 *
 	 * @param index source file index
 	 * @return {@link Reader}
 	 */
-	protected Reader readerForSourceFile(String index) {
-		String sourceFile = "input/test-" + index + "." + extension();
-		return new InputStreamReader(CSSMinifierTest.class.getClassLoader().getResourceAsStream(sourceFile));
+	protected Reader readerForIndex(String index) {
+		return readerForSourceFile("input/test-" + index + "." + extension());
 	}
 
 	/**
@@ -61,7 +64,7 @@ public abstract class AbstractMinifierTest {
 	 * @throws IOException if file can't be read
 	 */
 	protected String stringForExpectedFile(String index) throws IOException {
-		String expectedFile = "output/test-" + index + "." + extension();
+		String expectedFile = "expected/test-" + index + "." + extension();
 		return new String(Files.readAllBytes(Paths.get(RESOURCES_DIR, expectedFile)));
 	}
 
@@ -75,35 +78,31 @@ public abstract class AbstractMinifierTest {
 	protected abstract Minifier miniferForReader(Reader reader);
 
 	/**
-	 * Returns a list of filename "indexes" that will be used to construct the input
-	 * and expected output filenames.
+	 * Generates a {@link DynamicTest} for each input resource, minifying it and
+	 * comparing the result against the corresponding expected output file. Inputs
+	 * are discovered from the filesystem, so adding a new {@code input}/{@code
+	 * expected} pair is all that's needed to extend coverage.
 	 *
-	 * @return list of filename "indexes"
+	 * @return a {@link DynamicTest} per input resource
+	 * @throws IOException if the input directory can't be listed
 	 */
-	protected abstract List<String> resources();
-
-	/**
-	 * Loops over all filenames that can be constructed, reads in the source
-	 * content, minifies it, and compares the result to expected output.
-	 *
-	 * @throws IOException if there are any resource reading issues
-	 */
-	@Test
-	public void actualOutputMatchesExpected() throws IOException {
-		for (String index : resources()) {
-			Writer out = new StringWriter();
-			Minifier min = miniferForReader(readerForSourceFile(index));
-			try {
-				min.minify(out);
-			} catch (MinificationException e) {
-				LOG.error("MinificationException with cause: {}", e.getCause().getClass().getName());
-				fail(e);
-			}
-			String expected = stringForExpectedFile(index);
-			// trim() here because there seems to be a difference in line endings
-			assertEquals(expected.trim(), out.toString().trim(), getClass().getName() + " failed on index " + index);
+	@TestFactory
+	Stream<DynamicTest> minifiesEachResource() throws IOException {
+		List<Path> inputs;
+		try (Stream<Path> files = Files.list(Paths.get(RESOURCES_DIR, "input"))) {
+			inputs = files.filter(p -> p.getFileName().toString().endsWith("." + extension())).sorted()
+					.collect(Collectors.toList());
 		}
-		return;
+		return inputs.stream().map(input -> {
+			String filename = input.getFileName().toString();
+			String index = filename.substring("test-".length(), filename.lastIndexOf('.'));
+			return DynamicTest.dynamicTest(filename, () -> {
+				Writer out = new StringWriter();
+				miniferForReader(readerForIndex(index)).minify(out);
+				// trim() here because there seems to be a difference in line endings
+				assertEquals(stringForExpectedFile(index).trim(), out.toString().trim());
+			});
+		});
 	}
 
 	/**
@@ -113,9 +112,9 @@ public abstract class AbstractMinifierTest {
 	 * @param expected expected {@link Exception}
 	 * @throws IOException if there are any resource reading issues
 	 */
-	protected void throwsOnMinify(String index, Class<? extends Exception> expected) throws IOException {
+	protected void throwsOnMinify(String filename, Class<? extends Exception> expected) throws IOException {
 		Writer out = new StringWriter();
-		Minifier min = miniferForReader(readerForSourceFile(index));
+		Minifier min = miniferForReader(readerForSourceFile(filename));
 		try {
 			min.minify(out);
 		} catch (Exception e) {
@@ -123,7 +122,7 @@ public abstract class AbstractMinifierTest {
 			assertEquals(expected, e.getCause().getClass());
 			return;
 		}
-		fail("Expected: " + expected.getClass().getName());
+		fail("Expected: " + expected.getName());
 		return;
 	}
 }

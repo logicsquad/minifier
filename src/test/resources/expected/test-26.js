@@ -1,0 +1,1 @@
+var greeting="Hello, "+name+"!";var result=a*b+c/d;

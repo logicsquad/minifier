@@ -199,7 +199,7 @@ public class JSMinifier extends AbstractMinifier {
 			out.write(theA);
 		case COPY_GET:
 			theA = theB;
-			if (theA == '\'' || theA == '"') {
+			if (theA == '\'' || theA == '`' || theA == '"') {
 				for (;;) {
 					out.write(theA);
 					theA = get();
