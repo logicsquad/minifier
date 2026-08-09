@@ -121,6 +121,28 @@
             </dependency>
           </dependencies>
         </plugin>
+	<plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>${maven-gpg-plugin.version}</version>
+          <configuration>
+            <gpgArguments>
+              <arg>--batch</arg>
+              <arg>--yes</arg>
+              <arg>--pinentry-mode</arg>
+              <arg>loopback</arg>
+            </gpgArguments>
+          </configuration>
+          <executions>
+            <execution>
+              <id>sign-artifacts</id>
+              <phase>verify</phase>
+              <goals>
+		<goal>sign</goal>
+              </goals>
+            </execution>
+          </executions>
+	</plugin>
       </plugins>
     </pluginManagement>
 
@@ -181,28 +203,6 @@
             <id>attach-javadocs</id>
             <goals>
               <goal>jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-        <version>${maven-gpg-plugin.version}</version>
-        <configuration>
-          <gpgArguments>
-            <arg>--batch</arg>
-            <arg>--yes</arg>
-            <arg>--pinentry-mode</arg>
-            <arg>loopback</arg>
-          </gpgArguments>
-        </configuration>
-        <executions>
-          <execution>
-            <id>sign-artifacts</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>sign</goal>
             </goals>
           </execution>
         </executions>
