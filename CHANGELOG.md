@@ -3,6 +3,20 @@
 The format here is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4] - 2026-08-09
+### Added
+- Now supports nested rules. #11
+
+### Changed
+- Removed `log4j2.properties`. #12
+- Improved exception handling in some edge cases. #13
+
+### Fixed
+- Fixed minification of template literals. #8
+- Fixed mis-parsing of single-quoted strings and `url()` values
+  containing `)`. #14
+- Fixed over-stripping of quotes in `url()`. #15
+
 ## [1.3] - 2024-10-28
 ### Fixed
 - Fixed an edge case where a valid comment syntax was being flagged as
