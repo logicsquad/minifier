@@ -7,7 +7,9 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -81,6 +83,25 @@ public class CSSMinifier extends AbstractMinifier {
 	 * Corresponding numeric font weight values
 	 */
 	private static final String[] FONT_WEIGHT_VALUES = { "400", "700" };
+
+	/**
+	 * Properties whose values follow the margin pattern, in which a value can be left
+	 * out if it repeats the value it would be copied from: "3px 3px" is equivalent to
+	 * "3px", and "1px 2px 1px 2px" to "1px 2px". Repeated values are only removed from
+	 * these properties.
+	 */
+	private static final Set<String> MARGIN_STYLE_PROPERTIES = new HashSet<>(Arrays.asList(
+			// One to four values, for the sides (or, for border-radius, the corners) of a box
+			"margin", "padding", "inset", "border-width", "border-style", "border-color", "border-radius",
+			"scroll-margin", "scroll-padding", "border-image-outset", "border-image-slice", "border-image-width",
+			// One or two values, for the start and end sides
+			"margin-block", "margin-inline", "padding-block", "padding-inline", "inset-block", "inset-inline",
+			"scroll-margin-block", "scroll-margin-inline", "scroll-padding-block", "scroll-padding-inline",
+			"border-block-width", "border-block-style", "border-block-color", "border-inline-width",
+			"border-inline-style", "border-inline-color",
+			// One or two values, for the two axes
+			"gap", "grid-gap", "border-spacing", "overflow", "overscroll-behavior", "background-repeat",
+			"border-image-repeat"));
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
@@ -720,9 +741,10 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 
 		private void simplifyParameters() {
-			if (this.property.equals("background-size") || this.property.equals("quotes")
-					|| this.property.equals("transform-origin") || this.property.equals("grid-template-columns")
-					|| this.property.equals("grid-template-rows") || this.property.equals("background-position"))
+			// A border-radius with a "/" has separate vertical radii, so doesn't follow the
+			// margin pattern as a whole.
+			if (!MARGIN_STYLE_PROPERTIES.contains(this.property)
+					|| (this.property.equals("border-radius") && this.contents.contains("/")))
 				return;
 
 			StringBuffer newContents = new StringBuffer();
