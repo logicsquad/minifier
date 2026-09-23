@@ -641,14 +641,18 @@ public class CSSMinifier extends AbstractMinifier {
 				try {
 					for (int i = 0; i < rgbColours.length; i++) {
 						colourValue = Integer.parseInt(rgbColours[i]);
+						if (colourValue > 255) {
+							// Valid CSS (browsers clamp it to 255), but it has no two-digit hex form.
+							throw new NumberFormatException("rgb() component above 255: " + colourValue);
+						}
 						if (colourValue < 16) {
 							hexColour.append("0");
 						}
 						hexColour.append(Integer.toHexString(colourValue));
 					}
 				} catch (NumberFormatException e) {
-					// A component is out of int range (or otherwise unparseable). Leave this
-					// colour untouched rather than aborting minification, consistent with how
+					// A component is above 255, out of int range, or otherwise unparseable. Leave
+					// this colour untouched rather than aborting minification, consistent with how
 					// non-numeric rgb() values are left alone.
 					matcher.appendReplacement(newContents, Matcher.quoteReplacement(matcher.group()));
 					continue;
