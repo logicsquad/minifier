@@ -72,14 +72,15 @@ public class CSSMinifier extends AbstractMinifier {
 			"#ff0", "#9acd32" };
 
 	/**
-	 * Symbolic font weight names
+	 * Symbolic font weight names. The relative weights "bolder" and "lighter"
+	 * depend on the inherited weight, so have no numeric equivalent.
 	 */
-	private static final String[] FONT_WEIGHT_NAMES = { "normal", "bold", "bolder", "lighter" };
+	private static final String[] FONT_WEIGHT_NAMES = { "normal", "bold" };
 
 	/**
 	 * Corresponding numeric font weight values
 	 */
-	private static final String[] FONT_WEIGHT_VALUES = { "400", "700", "900", "100" };
+	private static final String[] FONT_WEIGHT_VALUES = { "400", "700" };
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
