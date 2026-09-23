@@ -223,7 +223,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		public Selector(String selector)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
-			int brace = selector.indexOf('{');
+			int brace = openingBrace(selector);
 			if (brace < 0) {
 				throw new IncompleteSelectorException(selector);
 			}
@@ -264,7 +264,8 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		private void init(String header, String body)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
-			this.selector = header.trim().replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1");
+			this.selector = outsideStringsAndUrls(header.trim(),
+					s -> s.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1"));
 			body = body.trim();
 			// Drop a single trailing semicolon so the final declaration parses cleanly.
 			if (body.endsWith(";")) {
@@ -425,6 +426,30 @@ public class CSSMinifier extends AbstractMinifier {
 				}
 			}
 			return i;
+		}
+
+		/**
+		 * Returns the index of the first opening brace in {@code s} that isn't inside a
+		 * string or {@code url()} token.
+		 *
+		 * @param s the string being scanned
+		 * @return the index of the opening brace, or -1 if there is none
+		 */
+		private static int openingBrace(String s) {
+			int i = 0;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = consumeString(s, i, null);
+				} else if (isUrlStart(s, i)) {
+					i = consumeUrl(s, i, null);
+				} else if (c == '{') {
+					return i;
+				} else {
+					i++;
+				}
+			}
+			return -1;
 		}
 
 		/**

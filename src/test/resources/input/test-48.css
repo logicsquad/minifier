@@ -1,0 +1,14 @@
+@import url("a, b.css");
+@import "a + b.css";
+
+a[title="a + b"], a[title = "x = y"] {
+    color: red;
+}
+
+[data-x="1 > 0"] > [data-y="a, b"] ~ b {
+    color: red;
+}
+
+a[title="{"] {
+    color: red;
+}
