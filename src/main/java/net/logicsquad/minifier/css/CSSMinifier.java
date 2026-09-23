@@ -560,7 +560,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 * @returns An array of Parts
 		 */
 		private Part[] parseValues(String contents) {
-			String[] parts = contents.split(",");
+			String[] parts = splitValues(contents);
 			List<Part> results = new ArrayList<>(parts.length);
 
 			for (int i = 0; i < parts.length; i++) {
@@ -574,6 +574,37 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 
 			return results.toArray(new Part[0]);
+		}
+
+		/**
+		 * Splits {@code contents} at each comma, except for commas inside a string or
+		 * a {@code url()} token (such as a data URI), which belong to the value that
+		 * contains them.
+		 *
+		 * @param contents the property value to split
+		 * @return the comma-separated values
+		 */
+		private static String[] splitValues(String contents) {
+			List<String> values = new ArrayList<>();
+			StringBuilder value = new StringBuilder();
+			int i = 0;
+			while (i < contents.length()) {
+				char c = contents.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = Selector.consumeString(contents, i, value);
+				} else if (Selector.isUrlStart(contents, i)) {
+					i = Selector.consumeUrl(contents, i, value);
+				} else if (c == ',') {
+					values.add(value.toString());
+					value.setLength(0);
+					i++;
+				} else {
+					value.append(c);
+					i++;
+				}
+			}
+			values.add(value.toString());
+			return values.toArray(new String[0]);
 		}
 
 		private String simplifyColours(String contents) {
