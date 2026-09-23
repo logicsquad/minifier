@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -427,6 +428,39 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 
 		/**
+		 * Applies {@code f} to each run of {@code s} outside strings and {@code url()}
+		 * tokens, copying the strings and {@code url()} tokens unchanged so that a
+		 * simplification can't alter their contents.
+		 *
+		 * @param s the string to simplify
+		 * @param f the simplification to apply
+		 * @return {@code s}, with {@code f} applied outside strings and {@code url()}
+		 *         tokens
+		 */
+		private static String outsideStringsAndUrls(String s, UnaryOperator<String> f) {
+			StringBuilder sb = new StringBuilder(s.length());
+			StringBuilder run = new StringBuilder();
+			int i = 0;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (c == '"' || c == '\'') {
+					sb.append(f.apply(run.toString()));
+					run.setLength(0);
+					i = consumeString(s, i, sb);
+				} else if (isUrlStart(s, i)) {
+					sb.append(f.apply(run.toString()));
+					run.setLength(0);
+					i = consumeUrl(s, i, sb);
+				} else {
+					run.append(c);
+					i++;
+				}
+			}
+			sb.append(f.apply(run.toString()));
+			return sb.toString();
+		}
+
+		/**
 		 * Parses {@code declaration} as a {@link Property} and adds it to
 		 * {@code props}. Blank declarations are ignored, and incomplete ones are
 		 * logged and skipped.
@@ -528,7 +562,8 @@ public class CSSMinifier extends AbstractMinifier {
 				prop = prop.toLowerCase();
 			}
 			this.property = prop;
-			this.parts = parseValues(simplifyColours(parts.get(1).trim().replaceAll(", ", ",")));
+			this.parts = parseValues(Selector.outsideStringsAndUrls(parts.get(1).trim(),
+					value -> simplifyColours(value.replaceAll(", ", ","))));
 		}
 
 		/**
@@ -712,10 +747,11 @@ public class CSSMinifier extends AbstractMinifier {
 
 		private void simplify() {
 			// !important doesn't need to be spaced
-			this.contents = this.contents.replaceAll(" !important", "!important");
+			this.contents = Selector.outsideStringsAndUrls(this.contents, s -> s.replaceAll(" !important", "!important"));
 
 			// Replace 0in, 0cm, etc. with just 0
-			this.contents = this.contents.replaceAll("(\\s)(0)(px|em|%|in|cm|mm|pc|pt|ex)", "$1$2");
+			this.contents = Selector.outsideStringsAndUrls(this.contents,
+					s -> s.replaceAll("(\\s)(0)(px|em|%|in|cm|mm|pc|pt|ex)", "$1$2"));
 
 			// Replace 0.6 with .6
 			// Disabled, as it actually makes compression worse! People use rgba(0,0,0,0)
@@ -731,13 +767,12 @@ public class CSSMinifier extends AbstractMinifier {
 			// Simplify font weights
 			simplifyFontWeights();
 
-			// Strip unnecessary quotes from url() and single-word parts, and make as much
-			// lowercase as possible.
+			// Strip unnecessary quotes from url(), and make as much lowercase as possible.
 			simplifyQuotesAndCaps();
 
 			// Simplify colours
 			simplifyColourNames();
-			simplifyHexColours();
+			this.contents = Selector.outsideStringsAndUrls(this.contents, Part::simplifyHexColours);
 		}
 
 		private void simplifyParameters() {
@@ -824,7 +859,6 @@ public class CSSMinifier extends AbstractMinifier {
 					if (!this.property.equalsIgnoreCase("animation-name")) {
 						this.contents = lowerCaseOutsideStringsAndUrls(this.contents);
 					}
-					this.contents = this.contents.replaceAll("('|\")?(.*?)\1", "$2");
 				}
 			}
 		}
@@ -870,7 +904,7 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 		}
 
-		private void simplifyHexColours() {
+		private static String simplifyHexColours(String contents) {
 			StringBuffer newContents = new StringBuffer();
 
 			// The lookahead stops this matching the first six digits of an eight-digit
@@ -878,7 +912,7 @@ public class CSSMinifier extends AbstractMinifier {
 			Pattern pattern = Pattern
 					.compile("#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])"
 							+ "(?![0-9a-fA-F])");
-			Matcher matcher = pattern.matcher(this.contents);
+			Matcher matcher = pattern.matcher(contents);
 
 			while (matcher.find()) {
 				if (matcher.group(1).equalsIgnoreCase(matcher.group(2))
@@ -892,7 +926,7 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 			matcher.appendTail(newContents);
 
-			this.contents = newContents.toString();
+			return newContents.toString();
 		}
 
 		/**
