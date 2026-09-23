@@ -799,11 +799,35 @@ public class CSSMinifier extends AbstractMinifier {
 				String[] words = this.contents.split("\\s");
 				if (words.length == 1) {
 					if (!this.property.equalsIgnoreCase("animation-name")) {
-						this.contents = this.contents.toLowerCase();
+						this.contents = lowerCaseOutsideStringsAndUrls(this.contents);
 					}
 					this.contents = this.contents.replaceAll("('|\")?(.*?)\1", "$2");
 				}
 			}
+		}
+
+		/**
+		 * Returns {@code s} in lowercase, except for any strings and {@code url()}
+		 * tokens within it, which are case-sensitive and are copied unchanged.
+		 *
+		 * @param s the string to lowercase
+		 * @return {@code s}, lowercased outside strings and {@code url()} tokens
+		 */
+		private static String lowerCaseOutsideStringsAndUrls(String s) {
+			StringBuilder sb = new StringBuilder(s.length());
+			int i = 0;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = Selector.consumeString(s, i, sb);
+				} else if (Selector.isUrlStart(s, i)) {
+					i = Selector.consumeUrl(s, i, sb);
+				} else {
+					sb.append(Character.toLowerCase(c));
+					i++;
+				}
+			}
+			return sb.toString();
 		}
 
 		private void simplifyColourNames() {
