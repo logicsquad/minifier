@@ -767,7 +767,9 @@ public class CSSMinifier extends AbstractMinifier {
 			// Simplify font weights
 			simplifyFontWeights();
 
-			// Strip unnecessary quotes from url(), and make as much lowercase as possible.
+			// Strip unnecessary quotes from url(), and excess whitespace from var(). Values
+			// are deliberately not lowercased: some, such as custom property values, are
+			// case-sensitive.
 			simplifyQuotesAndCaps();
 
 			// Simplify colours
@@ -853,38 +855,7 @@ public class CSSMinifier extends AbstractMinifier {
 				// We can't just remove all whitespace in the line, but we can ensure there's a maximum of one space in any run.
 				// https://github.com/logicsquad/minifier/issues/5
 				this.contents = this.contents.replaceAll("\\s{2,}", " ").trim();
-			} else {
-				String[] words = this.contents.split("\\s");
-				if (words.length == 1) {
-					if (!this.property.equalsIgnoreCase("animation-name")) {
-						this.contents = lowerCaseOutsideStringsAndUrls(this.contents);
-					}
-				}
 			}
-		}
-
-		/**
-		 * Returns {@code s} in lowercase, except for any strings and {@code url()}
-		 * tokens within it, which are case-sensitive and are copied unchanged.
-		 *
-		 * @param s the string to lowercase
-		 * @return {@code s}, lowercased outside strings and {@code url()} tokens
-		 */
-		private static String lowerCaseOutsideStringsAndUrls(String s) {
-			StringBuilder sb = new StringBuilder(s.length());
-			int i = 0;
-			while (i < s.length()) {
-				char c = s.charAt(i);
-				if (c == '"' || c == '\'') {
-					i = Selector.consumeString(s, i, sb);
-				} else if (Selector.isUrlStart(s, i)) {
-					i = Selector.consumeUrl(s, i, sb);
-				} else {
-					sb.append(Character.toLowerCase(c));
-					i++;
-				}
-			}
-			return sb.toString();
 		}
 
 		private void simplifyColourNames() {
