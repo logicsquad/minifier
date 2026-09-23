@@ -632,6 +632,12 @@ public class CSSMinifier extends AbstractMinifier {
 			while (matcher.find()) {
 				hexColour = new StringBuffer("#");
 				rgbColours = matcher.group(1).split(",");
+				if (rgbColours.length != 3) {
+					// Only rgb(r,g,b) has a hex equivalent here. A fourth (alpha) component is
+					// not a byte (rgb(255,0,0,1) is opaque), so leave the colour untouched.
+					matcher.appendReplacement(newContents, Matcher.quoteReplacement(matcher.group()));
+					continue;
+				}
 				try {
 					for (int i = 0; i < rgbColours.length; i++) {
 						colourValue = Integer.parseInt(rgbColours[i]);
