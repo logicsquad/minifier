@@ -693,18 +693,8 @@ public class CSSMinifier extends AbstractMinifier {
 
 			this.contents = this.contents.trim();
 
-			// Simplify multiple zeroes
-			if (this.contents.equals("0 0 0 0")) {
-				this.contents = "0";
-			}
-			if (this.contents.equals("0 0 0")) {
-				this.contents = "0";
-			}
-			if (this.contents.equals("0 0")) {
-				this.contents = "0";
-			}
-
-			// Simplify multiple-parameter properties
+			// Simplify multiple-parameter properties (which also reduces multiple zeroes,
+			// such as "0 0 0 0", to "0")
 			simplifyParameters();
 
 			// Simplify font weights
@@ -722,7 +712,7 @@ public class CSSMinifier extends AbstractMinifier {
 		private void simplifyParameters() {
 			if (this.property.equals("background-size") || this.property.equals("quotes")
 					|| this.property.equals("transform-origin") || this.property.equals("grid-template-columns")
-					|| this.property.equals("grid-template-rows"))
+					|| this.property.equals("grid-template-rows") || this.property.equals("background-position"))
 				return;
 
 			StringBuffer newContents = new StringBuffer();
