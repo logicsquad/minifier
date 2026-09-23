@@ -841,8 +841,11 @@ public class CSSMinifier extends AbstractMinifier {
 		private void simplifyHexColours() {
 			StringBuffer newContents = new StringBuffer();
 
+			// The lookahead stops this matching the first six digits of an eight-digit
+			// (#rrggbbaa) colour.
 			Pattern pattern = Pattern
-					.compile("#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])");
+					.compile("#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])"
+							+ "(?![0-9a-fA-F])");
 			Matcher matcher = pattern.matcher(this.contents);
 
 			while (matcher.find()) {
