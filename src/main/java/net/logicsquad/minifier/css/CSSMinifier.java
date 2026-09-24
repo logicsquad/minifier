@@ -126,17 +126,16 @@ public class CSSMinifier extends AbstractMinifier {
 					n; // Current position in stream
 			char curr;
 
-			StringBuffer sb = new StringBuffer();
+			// Keep the line breaks between lines: a line break is whitespace, which can
+			// separate tokens.
+			List<String> lines = new ArrayList<>();
 			String s;
 			while ((s = br.readLine()) != null) {
-				if (s.trim().equals("")) {
-					continue;
-				}
-				sb.append(s);
+				lines.add(s);
 			}
 
 			LOG.debug("Removing comments...");
-			String css = removeComments(sb.toString());
+			String css = removeComments(String.join("\n", lines));
 			LOG.debug("Parsing and processing selectors...");
 			List<Selector> selectors = new ArrayList<>();
 			// Scan for top-level rules, skipping strings, url() tokens and (retained)
@@ -224,7 +223,8 @@ public class CSSMinifier extends AbstractMinifier {
 	 * that the start of a comment inside one isn't taken for a comment, and a
 	 * retained comment is copied whole, so that the start of a comment inside it
 	 * isn't either. A string or {@code url()} token left open at the end of the input
-	 * is closed, as a browser closes it.
+	 * is closed, as a browser closes it, and a line break that isn't inside a string,
+	 * {@code url()} token or retained comment becomes a space.
 	 *
 	 * @param css the CSS to remove comments from
 	 * @return {@code css}, without any comments that aren't retained
@@ -250,6 +250,10 @@ public class CSSMinifier extends AbstractMinifier {
 					sb.append(css, i, end + 2);
 				}
 				i = end + 2;
+			} else if (c == '\n') {
+				// A line break here is just whitespace.
+				sb.append(' ');
+				i++;
 			} else {
 				sb.append(c);
 				i++;
@@ -364,15 +368,41 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Minifies a selector, or other text outside a rule's body such as an at-rule
-		 * statement, by removing the whitespace around combinators and attribute
-		 * operators. Strings, {@code url()} tokens and comments are left as they are.
+		 * statement. Each run of whitespace is reduced to a single space, which is then
+		 * removed around combinators, attribute operators and the ";" that ends a
+		 * statement, and after any comments and statements in front of the selector.
+		 * Strings, {@code url()} tokens and comments are left as they are.
 		 *
 		 * @param text the text to minify
 		 * @return the minified text
 		 */
 		private static String minifySelector(String text) {
-			return outsideStringsAndUrls(text.trim(),
-					s -> s.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1"));
+			String minified = outsideStringsAndUrls(text.trim(), s -> s.replaceAll("\\s+", " ")
+					.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>|;)\\s?", "$1"));
+			// Whitespace after a comment that comes before anything else, or after a
+			// statement, isn't needed. (Elsewhere, as in "div /* c */ p", it can be.)
+			StringBuilder sb = new StringBuilder(minified.length());
+			boolean leading = true;
+			int i = 0;
+			while (i < minified.length()) {
+				char c = minified.charAt(i);
+				if (minified.startsWith("/*", i)) {
+					i = consumeComment(minified, i, sb);
+				} else if (c == ' ' && leading) {
+					i++;
+				} else if (c == '"' || c == '\'') {
+					i = consumeString(minified, i, sb);
+					leading = false;
+				} else if (isUrlStart(minified, i)) {
+					i = consumeUrl(minified, i, sb);
+					leading = false;
+				} else {
+					sb.append(c);
+					leading = c == ';';
+					i++;
+				}
+			}
+			return sb.toString();
 		}
 
 		/**
@@ -713,7 +743,7 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 			this.property = prop;
 			this.parts = parseValues(Selector.outsideStringsAndUrls(parts.get(1).trim(),
-					value -> simplifyColours(value.replaceAll(", ", ","))));
+					value -> simplifyColours(value.replaceAll("\\s+", " ").replaceAll(", ", ","))));
 		}
 
 		/**
