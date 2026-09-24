@@ -223,7 +223,8 @@ public class CSSMinifier extends AbstractMinifier {
 	 * comments, which are retained. Strings and {@code url()} tokens are skipped, so
 	 * that the start of a comment inside one isn't taken for a comment, and a
 	 * retained comment is copied whole, so that the start of a comment inside it
-	 * isn't either.
+	 * isn't either. A string or {@code url()} token left open at the end of the input
+	 * is closed, as a browser closes it.
 	 *
 	 * @param css the CSS to remove comments from
 	 * @return {@code css}, without any comments that aren't retained
@@ -378,7 +379,10 @@ public class CSSMinifier extends AbstractMinifier {
 		 * Consumes a quoted string starting at {@code i} (the opening quote), appending
 		 * the consumed characters to {@code sb} (which may be {@code null} to skip
 		 * without collecting). Backslash escapes are honoured, so an escaped quote does
-		 * not terminate the string.
+		 * not terminate the string. A string still open at the end of {@code s} is
+		 * closed in {@code sb}, as a browser closes one left open at the end of a
+		 * stylesheet, and a backslash at the very end, which escapes nothing, is
+		 * dropped.
 		 *
 		 * @param s  the string being scanned
 		 * @param i  index of the opening quote
@@ -394,18 +398,24 @@ public class CSSMinifier extends AbstractMinifier {
 			i++;
 			while (i < s.length()) {
 				char c = s.charAt(i);
+				i++;
+				if (c == '\\' && i == s.length()) {
+					break; // a backslash at the very end escapes nothing
+				}
 				if (sb != null) {
 					sb.append(c);
 				}
-				i++;
-				if (c == '\\' && i < s.length()) {
+				if (c == '\\') {
 					if (sb != null) {
 						sb.append(s.charAt(i)); // escaped character, taken verbatim
 					}
 					i++;
 				} else if (c == quote) {
-					break;
+					return i;
 				}
+			}
+			if (sb != null) {
+				sb.append(quote); // close the unterminated string
 			}
 			return i;
 		}
@@ -435,7 +445,9 @@ public class CSSMinifier extends AbstractMinifier {
 		 * Consumes a {@code url(...)} token starting at {@code i} (the {@code u}),
 		 * appending the consumed characters to {@code sb} (which may be {@code null} to
 		 * skip without collecting). Quoted strings within the URL are skipped whole, so
-		 * a {@code )} inside such a string does not terminate the URL.
+		 * a {@code )} inside such a string does not terminate the URL. A URL still open
+		 * at the end of {@code s} is closed in {@code sb}, as a browser closes one left
+		 * open at the end of a stylesheet.
 		 *
 		 * @param s  the string being scanned
 		 * @param i  index of the leading {@code u} of {@code url(}
@@ -458,9 +470,12 @@ public class CSSMinifier extends AbstractMinifier {
 					}
 					i++;
 					if (c == ')') {
-						break;
+						return i;
 					}
 				}
+			}
+			if (sb != null) {
+				sb.append(')'); // close the unterminated URL
 			}
 			return i;
 		}
