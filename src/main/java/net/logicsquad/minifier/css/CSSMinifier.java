@@ -179,6 +179,11 @@ public class CSSMinifier extends AbstractMinifier {
 			for (Selector selector : selectors) {
 				pout.print(selector.toString());
 			}
+			// Anything after the last rule, such as a retained comment or an @layer
+			// statement, has no rule to be output with, so output it here.
+			if (j == 0) {
+				pout.print(Selector.minifySelector(css.substring(n)));
+			}
 			pout.print("\r\n");
 			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
@@ -290,8 +295,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		private void init(String header, String body)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
-			this.selector = outsideStringsAndUrls(header.trim(),
-					s -> s.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1"));
+			this.selector = minifySelector(header);
 			body = body.trim();
 			// Drop a single trailing semicolon so the final declaration parses cleanly.
 			if (body.endsWith(";")) {
@@ -335,6 +339,19 @@ public class CSSMinifier extends AbstractMinifier {
 			addProperty(props, pending.toString());
 			this.properties = props.toArray(new Property[0]);
 			sortProperties(this.properties);
+		}
+
+		/**
+		 * Minifies a selector, or other text outside a rule's body such as an at-rule
+		 * statement, by removing the whitespace around combinators and attribute
+		 * operators. Strings, {@code url()} tokens and comments are left as they are.
+		 *
+		 * @param text the text to minify
+		 * @return the minified text
+		 */
+		private static String minifySelector(String text) {
+			return outsideStringsAndUrls(text.trim(),
+					s -> s.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1"));
 		}
 
 		/**
