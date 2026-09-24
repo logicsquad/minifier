@@ -1,0 +1,11 @@
+.j {
+    content: "rgb(255, 0, 0), 0px !important";
+    background: url("a, b.png");
+    fill: url(#AABBCC);
+    stroke: url(#BADA55);
+}
+
+.j::after {
+    font-family: "Foo, Bar", serif;
+    border: 0px solid #AABBCC !important;
+}

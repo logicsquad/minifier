@@ -1,0 +1,7 @@
+.k {
+    --anim: FadeIn;
+    width: calc(var(--Gap)*2);
+    counter-reset: MyCounter;
+    grid-area: Main;
+    container-name: Sidebar;
+}

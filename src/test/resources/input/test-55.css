@@ -1,0 +1,20 @@
+/**
+Line one
+Line two
+*/
+div
+p {
+    font: 12px
+Arial;
+    width: calc(1px +
+2px);
+    content: "abc\
+def";
+}
+
+@media screen
+and (min-width: 100px) {
+    .a {
+        color: red;
+    }
+}

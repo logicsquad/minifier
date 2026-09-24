@@ -3,6 +3,42 @@
 The format here is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5] - 2026-09-24
+### Changed
+- Values are no longer lowercased (except six-digit hex colours),
+  since some are case-sensitive, such as custom property values and
+  animation, counter, grid area and container names. #23
+
+- Tidied up the POM, removing unused site, reporting and PMD
+  configuration.
+
+### Fixed
+- Fixed lowercasing of strings and `url()` values, which corrupted
+  data URIs. #16
+- Fixed replacement of `font-weight: bolder` and `lighter` with fixed
+  weights. #17
+- Fixed collapsing of `background-position` values, such as `0 0` to
+  `0`. #18
+- Fixed corruption of eight-digit hex colours, and of `rgb()` values
+  with an alpha channel. #19
+- Fixed conversion of `rgb()` values with components above 255 to
+  invalid hex colours. #20
+- Fixed collapsing of repeated values, such as `3px 3px` to `3px`, in
+  properties where that changes their meaning. #21
+- Fixed simplifications being applied inside strings and `url()`
+  values. #22
+- Fixed alteration of strings in selectors and `@import` rules. #24
+- Fixed parsing of kept `/** … */` comments as CSS, and of `/*` in
+  strings as a comment. #25
+- Fixed dropping of anything after the last rule, such as a kept
+  comment. A stylesheet made up only of `@import` rules no longer
+  minifies to nothing. #26
+- Fixed dropping of an unclosed rule at the end of the input. #27
+- Fixed unclosed strings and `url()` values at the end of the
+  input. #28
+- Fixed deletion of line breaks, which could run tokens together; they
+  are now treated as whitespace. #29
+
 ## [1.4] - 2026-08-09
 ### Added
 - Now supports nested rules. #11

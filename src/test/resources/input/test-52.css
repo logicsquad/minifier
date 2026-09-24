@@ -1,0 +1,11 @@
+.a {
+    color: red;
+}
+
+@media screen {
+    .b {
+        color: blue;
+    }
+
+    .c {
+        color: green

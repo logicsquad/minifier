@@ -1,6 +1,9 @@
 package net.logicsquad.minifier.css;
 
+import java.io.IOException;
 import java.io.Reader;
+
+import org.junit.jupiter.api.Test;
 
 import net.logicsquad.minifier.AbstractMinifierTest;
 import net.logicsquad.minifier.Minifier;
@@ -24,5 +27,11 @@ public class CSSMinifierTest extends AbstractMinifierTest {
 	@Override
 	protected Minifier miniferForReader(Reader reader) {
 		return new CSSMinifier(reader);
+	}
+
+	@Test
+	public void unterminatedCommentThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-comment.css", CSSMinifier.UnterminatedCommentException.class);
+		return;
 	}
 }

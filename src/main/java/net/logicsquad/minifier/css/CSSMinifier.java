@@ -7,7 +7,10 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -72,14 +75,34 @@ public class CSSMinifier extends AbstractMinifier {
 			"#ff0", "#9acd32" };
 
 	/**
-	 * Symbolic font weight names
+	 * Symbolic font weight names. The relative weights "bolder" and "lighter"
+	 * depend on the inherited weight, so have no numeric equivalent.
 	 */
-	private static final String[] FONT_WEIGHT_NAMES = { "normal", "bold", "bolder", "lighter" };
+	private static final String[] FONT_WEIGHT_NAMES = { "normal", "bold" };
 
 	/**
 	 * Corresponding numeric font weight values
 	 */
-	private static final String[] FONT_WEIGHT_VALUES = { "400", "700", "900", "100" };
+	private static final String[] FONT_WEIGHT_VALUES = { "400", "700" };
+
+	/**
+	 * Properties whose values follow the margin pattern, in which a value can be left
+	 * out if it repeats the value it would be copied from: "3px 3px" is equivalent to
+	 * "3px", and "1px 2px 1px 2px" to "1px 2px". Repeated values are only removed from
+	 * these properties.
+	 */
+	private static final Set<String> MARGIN_STYLE_PROPERTIES = new HashSet<>(Arrays.asList(
+			// One to four values, for the sides (or, for border-radius, the corners) of a box
+			"margin", "padding", "inset", "border-width", "border-style", "border-color", "border-radius",
+			"scroll-margin", "scroll-padding", "border-image-outset", "border-image-slice", "border-image-width",
+			// One or two values, for the start and end sides
+			"margin-block", "margin-inline", "padding-block", "padding-inline", "inset-block", "inset-inline",
+			"scroll-margin-block", "scroll-margin-inline", "scroll-padding-block", "scroll-padding-inline",
+			"border-block-width", "border-block-style", "border-block-color", "border-inline-width",
+			"border-inline-style", "border-inline-color",
+			// One or two values, for the two axes
+			"gap", "grid-gap", "border-spacing", "overflow", "overscroll-behavior", "background-repeat",
+			"border-image-repeat"));
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
@@ -99,40 +122,24 @@ public class CSSMinifier extends AbstractMinifier {
 	@Override
 	public void minify(Writer writer) throws MinificationException {
 		try (BufferedReader br = new BufferedReader(reader()); PrintWriter pout = new PrintWriter(writer)) {
-			int k, j, // Number of open braces
+			int j, // Number of open braces
 					n; // Current position in stream
 			char curr;
 
-			StringBuffer sb = new StringBuffer();
+			// Keep the line breaks between lines: a line break is whitespace, which can
+			// separate tokens.
+			List<String> lines = new ArrayList<>();
 			String s;
 			while ((s = br.readLine()) != null) {
-				if (s.trim().equals("")) {
-					continue;
-				}
-				sb.append(s);
+				lines.add(s);
 			}
 
 			LOG.debug("Removing comments...");
-			// Find the start of the comment
-			n = 0;
-			while ((n = sb.indexOf("/*", n)) != -1) {
-				// Here we retain "Javadoc-style" comments. We're looking for "/**", but need to exclude "/**/".
-				// https://github.com/logicsquad/minifier/issues/4
-				if (sb.charAt(n + 2) == '*' && sb.charAt(n + 3) != '/') {
-					n += 2;
-					continue;
-				}
-				k = sb.indexOf("*/", n + 2);
-				if (k == -1) {
-					throw new UnterminatedCommentException();
-				}
-				sb.delete(n, k + 2);
-			}
+			String css = removeComments(String.join("\n", lines));
 			LOG.debug("Parsing and processing selectors...");
 			List<Selector> selectors = new ArrayList<>();
-			// Scan for top-level rules, skipping strings and url() tokens so that braces
-			// inside them are not mistaken for rule boundaries.
-			String css = sb.toString();
+			// Scan for top-level rules, skipping strings, url() tokens and (retained)
+			// comments so that braces inside them are not mistaken for rule boundaries.
 			n = 0;
 			j = 0;
 			int i = 0;
@@ -142,6 +149,8 @@ public class CSSMinifier extends AbstractMinifier {
 					i = Selector.consumeString(css, i, null);
 				} else if (Selector.isUrlStart(css, i)) {
 					i = Selector.consumeUrl(css, i, null);
+				} else if (css.startsWith("/*", i)) {
+					i = Selector.consumeComment(css, i, null);
 				} else if (curr == '{') {
 					j++;
 					i++;
@@ -152,23 +161,30 @@ public class CSSMinifier extends AbstractMinifier {
 						throw new UnbalancedBracesException();
 					}
 					if (j == 0) {
-						try {
-							selectors.add(new Selector(css.substring(n, i)));
-						} catch (UnterminatedSelectorException usex) {
-							LOG.debug("Unterminated selector: {}", usex.getMessage());
-						} catch (EmptySelectorBodyException ebex) {
-							LOG.debug("Empty selector body: {}", ebex.getMessage());
-						}
+						addSelector(selectors, css.substring(n, i));
 						n = i;
 					}
 				} else {
 					i++;
 				}
 			}
+			if (j > 0) {
+				// The input ends inside a rule that was never closed. Browsers close any
+				// blocks still open at the end of a stylesheet, so do the same.
+				StringBuilder rule = new StringBuilder(css.substring(n));
+				for (; j > 0; j--) {
+					rule.append('}');
+				}
+				addSelector(selectors, rule.toString());
+				n = css.length();
+			}
 
 			for (Selector selector : selectors) {
 				pout.print(selector.toString());
 			}
+			// Anything after the last rule, such as a retained comment or an @layer
+			// statement, has no rule to be output with, so output it here.
+			pout.print(Selector.minifySelector(css.substring(n)));
 			pout.print("\r\n");
 			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
@@ -181,6 +197,69 @@ public class CSSMinifier extends AbstractMinifier {
 				throw new MinificationException("Minification failed due to Exception.", e);
 			}
 		}
+	}
+
+	/**
+	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
+	 * rule that is unterminated or has an empty body is logged and skipped.
+	 *
+	 * @param selectors list to add the parsed rule to
+	 * @param rule      a whole rule, from its selector to its closing brace
+	 * @throws IncompleteSelectorException if {@code rule} has no opening brace
+	 */
+	private static void addSelector(List<Selector> selectors, String rule) throws IncompleteSelectorException {
+		try {
+			selectors.add(new Selector(rule));
+		} catch (UnterminatedSelectorException usex) {
+			LOG.debug("Unterminated selector: {}", usex.getMessage());
+		} catch (EmptySelectorBodyException ebex) {
+			LOG.debug("Empty selector body: {}", ebex.getMessage());
+		}
+	}
+
+	/**
+	 * Returns {@code css} with its comments removed, apart from "Javadoc-style"
+	 * comments, which are retained. Strings and {@code url()} tokens are skipped, so
+	 * that the start of a comment inside one isn't taken for a comment, and a
+	 * retained comment is copied whole, so that the start of a comment inside it
+	 * isn't either. A string or {@code url()} token left open at the end of the input
+	 * is closed, as a browser closes it, and a line break that isn't inside a string,
+	 * {@code url()} token or retained comment becomes a space.
+	 *
+	 * @param css the CSS to remove comments from
+	 * @return {@code css}, without any comments that aren't retained
+	 * @throws UnterminatedCommentException if a comment is unterminated
+	 */
+	private static String removeComments(String css) throws UnterminatedCommentException {
+		StringBuilder sb = new StringBuilder(css.length());
+		int i = 0;
+		while (i < css.length()) {
+			char c = css.charAt(i);
+			if (c == '"' || c == '\'') {
+				i = Selector.consumeString(css, i, sb);
+			} else if (Selector.isUrlStart(css, i)) {
+				i = Selector.consumeUrl(css, i, sb);
+			} else if (css.startsWith("/*", i)) {
+				int end = css.indexOf("*/", i + 2);
+				if (end == -1) {
+					throw new UnterminatedCommentException();
+				}
+				// Here we retain "Javadoc-style" comments. We're looking for "/**", but need to exclude "/**/".
+				// https://github.com/logicsquad/minifier/issues/4
+				if (css.startsWith("/**", i) && !css.startsWith("/**/", i)) {
+					sb.append(css, i, end + 2);
+				}
+				i = end + 2;
+			} else if (c == '\n') {
+				// A line break here is just whitespace.
+				sb.append(' ');
+				i++;
+			} else {
+				sb.append(c);
+				i++;
+			}
+		}
+		return sb.toString();
 	}
 
 	/**
@@ -200,7 +279,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		public Selector(String selector)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
-			int brace = selector.indexOf('{');
+			int brace = openingBrace(selector);
 			if (brace < 0) {
 				throw new IncompleteSelectorException(selector);
 			}
@@ -241,7 +320,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		private void init(String header, String body)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
-			this.selector = header.trim().replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>)\\s?", "$1");
+			this.selector = minifySelector(header);
 			body = body.trim();
 			// Drop a single trailing semicolon so the final declaration parses cleanly.
 			if (body.endsWith(";")) {
@@ -261,6 +340,10 @@ public class CSSMinifier extends AbstractMinifier {
 					// A url(...) token: consume it whole, skipping strings within it so a
 					// ')' inside a quoted URL doesn't close it early.
 					i = consumeUrl(body, i, pending);
+				} else if (body.startsWith("/*", i)) {
+					// A retained comment: consume it whole, like a string, so that nothing
+					// inside it is mistaken for a boundary.
+					i = consumeComment(body, i, pending);
 				} else if (c == '{') {
 					// A nested rule starts here. Declarations were flushed at their ';',
 					// so "pending" now holds only this nested selector's header.
@@ -284,10 +367,52 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 
 		/**
+		 * Minifies a selector, or other text outside a rule's body such as an at-rule
+		 * statement. Each run of whitespace is reduced to a single space, which is then
+		 * removed around combinators, attribute operators and the ";" that ends a
+		 * statement, and after any comments and statements in front of the selector.
+		 * Strings, {@code url()} tokens and comments are left as they are.
+		 *
+		 * @param text the text to minify
+		 * @return the minified text
+		 */
+		private static String minifySelector(String text) {
+			String minified = outsideStringsAndUrls(text.trim(), s -> s.replaceAll("\\s+", " ")
+					.replaceAll("\\s?(\\+|~|,|=|~=|\\^=|\\$=|\\*=|\\|=|>|;)\\s?", "$1"));
+			// Whitespace after a comment that comes before anything else, or after a
+			// statement, isn't needed. (Elsewhere, as in "div /* c */ p", it can be.)
+			StringBuilder sb = new StringBuilder(minified.length());
+			boolean leading = true;
+			int i = 0;
+			while (i < minified.length()) {
+				char c = minified.charAt(i);
+				if (minified.startsWith("/*", i)) {
+					i = consumeComment(minified, i, sb);
+				} else if (c == ' ' && leading) {
+					i++;
+				} else if (c == '"' || c == '\'') {
+					i = consumeString(minified, i, sb);
+					leading = false;
+				} else if (isUrlStart(minified, i)) {
+					i = consumeUrl(minified, i, sb);
+					leading = false;
+				} else {
+					sb.append(c);
+					leading = c == ';';
+					i++;
+				}
+			}
+			return sb.toString();
+		}
+
+		/**
 		 * Consumes a quoted string starting at {@code i} (the opening quote), appending
 		 * the consumed characters to {@code sb} (which may be {@code null} to skip
 		 * without collecting). Backslash escapes are honoured, so an escaped quote does
-		 * not terminate the string.
+		 * not terminate the string. A string still open at the end of {@code s} is
+		 * closed in {@code sb}, as a browser closes one left open at the end of a
+		 * stylesheet, and a backslash at the very end, which escapes nothing, is
+		 * dropped.
 		 *
 		 * @param s  the string being scanned
 		 * @param i  index of the opening quote
@@ -303,18 +428,24 @@ public class CSSMinifier extends AbstractMinifier {
 			i++;
 			while (i < s.length()) {
 				char c = s.charAt(i);
+				i++;
+				if (c == '\\' && i == s.length()) {
+					break; // a backslash at the very end escapes nothing
+				}
 				if (sb != null) {
 					sb.append(c);
 				}
-				i++;
-				if (c == '\\' && i < s.length()) {
+				if (c == '\\') {
 					if (sb != null) {
 						sb.append(s.charAt(i)); // escaped character, taken verbatim
 					}
 					i++;
 				} else if (c == quote) {
-					break;
+					return i;
 				}
+			}
+			if (sb != null) {
+				sb.append(quote); // close the unterminated string
 			}
 			return i;
 		}
@@ -344,7 +475,9 @@ public class CSSMinifier extends AbstractMinifier {
 		 * Consumes a {@code url(...)} token starting at {@code i} (the {@code u}),
 		 * appending the consumed characters to {@code sb} (which may be {@code null} to
 		 * skip without collecting). Quoted strings within the URL are skipped whole, so
-		 * a {@code )} inside such a string does not terminate the URL.
+		 * a {@code )} inside such a string does not terminate the URL. A URL still open
+		 * at the end of {@code s} is closed in {@code sb}, as a browser closes one left
+		 * open at the end of a stylesheet.
 		 *
 		 * @param s  the string being scanned
 		 * @param i  index of the leading {@code u} of {@code url(}
@@ -367,17 +500,40 @@ public class CSSMinifier extends AbstractMinifier {
 					}
 					i++;
 					if (c == ')') {
-						break;
+						return i;
 					}
 				}
+			}
+			if (sb != null) {
+				sb.append(')'); // close the unterminated URL
 			}
 			return i;
 		}
 
 		/**
+		 * Consumes a comment starting at {@code i} (the {@code /} that opens it),
+		 * appending the consumed characters to {@code sb} (which may be {@code null} to
+		 * skip without collecting).
+		 *
+		 * @param s  the string being scanned
+		 * @param i  index of the start of the comment
+		 * @param sb buffer to append consumed characters to, or {@code null}
+		 * @return the index just past the end of the comment, or the length of
+		 *         {@code s} if the comment is unterminated
+		 */
+		private static int consumeComment(String s, int i, StringBuilder sb) {
+			int end = s.indexOf("*/", i + 2);
+			end = end == -1 ? s.length() : end + 2;
+			if (sb != null) {
+				sb.append(s, i, end);
+			}
+			return end;
+		}
+
+		/**
 		 * Given {@code i} pointing at an opening brace, returns the index just past the
-		 * matching closing brace. Braces inside strings and {@code url()} tokens are
-		 * ignored.
+		 * matching closing brace. Braces inside strings, {@code url()} tokens and
+		 * comments are ignored.
 		 *
 		 * @param s the string being scanned
 		 * @param i index of the opening brace
@@ -392,6 +548,8 @@ public class CSSMinifier extends AbstractMinifier {
 					i = consumeString(s, i, null);
 				} else if (isUrlStart(s, i)) {
 					i = consumeUrl(s, i, null);
+				} else if (s.startsWith("/*", i)) {
+					i = consumeComment(s, i, null);
 				} else {
 					i++;
 					if (c == '{') {
@@ -402,6 +560,69 @@ public class CSSMinifier extends AbstractMinifier {
 				}
 			}
 			return i;
+		}
+
+		/**
+		 * Returns the index of the first opening brace in {@code s} that isn't inside a
+		 * string, {@code url()} token or comment.
+		 *
+		 * @param s the string being scanned
+		 * @return the index of the opening brace, or -1 if there is none
+		 */
+		private static int openingBrace(String s) {
+			int i = 0;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = consumeString(s, i, null);
+				} else if (isUrlStart(s, i)) {
+					i = consumeUrl(s, i, null);
+				} else if (s.startsWith("/*", i)) {
+					i = consumeComment(s, i, null);
+				} else if (c == '{') {
+					return i;
+				} else {
+					i++;
+				}
+			}
+			return -1;
+		}
+
+		/**
+		 * Applies {@code f} to each run of {@code s} outside strings, {@code url()}
+		 * tokens and comments, copying those unchanged so that a simplification can't
+		 * alter their contents.
+		 *
+		 * @param s the string to simplify
+		 * @param f the simplification to apply
+		 * @return {@code s}, with {@code f} applied outside strings, {@code url()}
+		 *         tokens and comments
+		 */
+		private static String outsideStringsAndUrls(String s, UnaryOperator<String> f) {
+			StringBuilder sb = new StringBuilder(s.length());
+			StringBuilder run = new StringBuilder();
+			int i = 0;
+			while (i < s.length()) {
+				char c = s.charAt(i);
+				if (c == '"' || c == '\'') {
+					sb.append(f.apply(run.toString()));
+					run.setLength(0);
+					i = consumeString(s, i, sb);
+				} else if (isUrlStart(s, i)) {
+					sb.append(f.apply(run.toString()));
+					run.setLength(0);
+					i = consumeUrl(s, i, sb);
+				} else if (s.startsWith("/*", i)) {
+					sb.append(f.apply(run.toString()));
+					run.setLength(0);
+					i = consumeComment(s, i, sb);
+				} else {
+					run.append(c);
+					i++;
+				}
+			}
+			sb.append(f.apply(run.toString()));
+			return sb.toString();
 		}
 
 		/**
@@ -465,6 +686,8 @@ public class CSSMinifier extends AbstractMinifier {
 	private static class Property implements Comparable<Property> {
 		protected String property;
 		protected Part[] parts;
+		// Any retained comments in front of the declaration, copied through unchanged
+		protected String comments;
 
 		/**
 		 * Creates a new Property using the supplied strings. Parses out the values of
@@ -475,6 +698,19 @@ public class CSSMinifier extends AbstractMinifier {
 		 * @throws Exception If the property is incomplete and cannot be parsed.
 		 */
 		public Property(String property) throws IncompletePropertyException {
+			// Retained comments in front of the declaration are kept in front of it,
+			// unchanged, rather than being parsed as part of the property name.
+			property = property.trim();
+			int start = 0;
+			while (property.startsWith("/*", start)) {
+				start = Selector.consumeComment(property, start, null);
+				while (start < property.length() && Character.isWhitespace(property.charAt(start))) {
+					start++;
+				}
+			}
+			this.comments = property.substring(0, start).trim();
+			property = property.substring(start);
+
 			ArrayList<String> parts = new ArrayList<String>();
 			boolean bCanSplit = true;
 			int j = 0;
@@ -506,7 +742,8 @@ public class CSSMinifier extends AbstractMinifier {
 				prop = prop.toLowerCase();
 			}
 			this.property = prop;
-			this.parts = parseValues(simplifyColours(parts.get(1).trim().replaceAll(", ", ",")));
+			this.parts = parseValues(Selector.outsideStringsAndUrls(parts.get(1).trim(),
+					value -> simplifyColours(value.replaceAll("\\s+", " ").replaceAll(", ", ","))));
 		}
 
 		/**
@@ -516,7 +753,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 */
 		public String toString() {
 			StringBuffer sb = new StringBuffer();
-			sb.append(this.property).append(":");
+			sb.append(this.comments).append(this.property).append(":");
 			for (Part p : this.parts) {
 				if (p != null) {
 					sb.append(p.toString()).append(",");
@@ -560,7 +797,7 @@ public class CSSMinifier extends AbstractMinifier {
 		 * @returns An array of Parts
 		 */
 		private Part[] parseValues(String contents) {
-			String[] parts = contents.split(",");
+			String[] parts = splitValues(contents);
 			List<Part> results = new ArrayList<>(parts.length);
 
 			for (int i = 0; i < parts.length; i++) {
@@ -574,6 +811,39 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 
 			return results.toArray(new Part[0]);
+		}
+
+		/**
+		 * Splits {@code contents} at each comma, except for commas inside a string, a
+		 * {@code url()} token (such as a data URI) or a comment, which belong to the
+		 * value that contains them.
+		 *
+		 * @param contents the property value to split
+		 * @return the comma-separated values
+		 */
+		private static String[] splitValues(String contents) {
+			List<String> values = new ArrayList<>();
+			StringBuilder value = new StringBuilder();
+			int i = 0;
+			while (i < contents.length()) {
+				char c = contents.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = Selector.consumeString(contents, i, value);
+				} else if (Selector.isUrlStart(contents, i)) {
+					i = Selector.consumeUrl(contents, i, value);
+				} else if (contents.startsWith("/*", i)) {
+					i = Selector.consumeComment(contents, i, value);
+				} else if (c == ',') {
+					values.add(value.toString());
+					value.setLength(0);
+					i++;
+				} else {
+					value.append(c);
+					i++;
+				}
+			}
+			values.add(value.toString());
+			return values.toArray(new String[0]);
 		}
 
 		private String simplifyColours(String contents) {
@@ -600,17 +870,27 @@ public class CSSMinifier extends AbstractMinifier {
 			while (matcher.find()) {
 				hexColour = new StringBuffer("#");
 				rgbColours = matcher.group(1).split(",");
+				if (rgbColours.length != 3) {
+					// Only rgb(r,g,b) has a hex equivalent here. A fourth (alpha) component is
+					// not a byte (rgb(255,0,0,1) is opaque), so leave the colour untouched.
+					matcher.appendReplacement(newContents, Matcher.quoteReplacement(matcher.group()));
+					continue;
+				}
 				try {
 					for (int i = 0; i < rgbColours.length; i++) {
 						colourValue = Integer.parseInt(rgbColours[i]);
+						if (colourValue > 255) {
+							// Valid CSS (browsers clamp it to 255), but it has no two-digit hex form.
+							throw new NumberFormatException("rgb() component above 255: " + colourValue);
+						}
 						if (colourValue < 16) {
 							hexColour.append("0");
 						}
 						hexColour.append(Integer.toHexString(colourValue));
 					}
 				} catch (NumberFormatException e) {
-					// A component is out of int range (or otherwise unparseable). Leave this
-					// colour untouched rather than aborting minification, consistent with how
+					// A component is above 255, out of int range, or otherwise unparseable. Leave
+					// this colour untouched rather than aborting minification, consistent with how
 					// non-numeric rgb() values are left alone.
 					matcher.appendReplacement(newContents, Matcher.quoteReplacement(matcher.group()));
 					continue;
@@ -649,10 +929,11 @@ public class CSSMinifier extends AbstractMinifier {
 
 		private void simplify() {
 			// !important doesn't need to be spaced
-			this.contents = this.contents.replaceAll(" !important", "!important");
+			this.contents = Selector.outsideStringsAndUrls(this.contents, s -> s.replaceAll(" !important", "!important"));
 
 			// Replace 0in, 0cm, etc. with just 0
-			this.contents = this.contents.replaceAll("(\\s)(0)(px|em|%|in|cm|mm|pc|pt|ex)", "$1$2");
+			this.contents = Selector.outsideStringsAndUrls(this.contents,
+					s -> s.replaceAll("(\\s)(0)(px|em|%|in|cm|mm|pc|pt|ex)", "$1$2"));
 
 			// Replace 0.6 with .6
 			// Disabled, as it actually makes compression worse! People use rgba(0,0,0,0)
@@ -661,36 +942,28 @@ public class CSSMinifier extends AbstractMinifier {
 
 			this.contents = this.contents.trim();
 
-			// Simplify multiple zeroes
-			if (this.contents.equals("0 0 0 0")) {
-				this.contents = "0";
-			}
-			if (this.contents.equals("0 0 0")) {
-				this.contents = "0";
-			}
-			if (this.contents.equals("0 0")) {
-				this.contents = "0";
-			}
-
-			// Simplify multiple-parameter properties
+			// Simplify multiple-parameter properties (which also reduces multiple zeroes,
+			// such as "0 0 0 0", to "0")
 			simplifyParameters();
 
 			// Simplify font weights
 			simplifyFontWeights();
 
-			// Strip unnecessary quotes from url() and single-word parts, and make as much
-			// lowercase as possible.
+			// Strip unnecessary quotes from url(), and excess whitespace from var(). Values
+			// are deliberately not lowercased: some, such as custom property values, are
+			// case-sensitive.
 			simplifyQuotesAndCaps();
 
 			// Simplify colours
 			simplifyColourNames();
-			simplifyHexColours();
+			this.contents = Selector.outsideStringsAndUrls(this.contents, Part::simplifyHexColours);
 		}
 
 		private void simplifyParameters() {
-			if (this.property.equals("background-size") || this.property.equals("quotes")
-					|| this.property.equals("transform-origin") || this.property.equals("grid-template-columns")
-					|| this.property.equals("grid-template-rows"))
+			// A border-radius with a "/" has separate vertical radii, so doesn't follow the
+			// margin pattern as a whole.
+			if (!MARGIN_STYLE_PROPERTIES.contains(this.property)
+					|| (this.property.equals("border-radius") && this.contents.contains("/")))
 				return;
 
 			StringBuffer newContents = new StringBuffer();
@@ -764,14 +1037,6 @@ public class CSSMinifier extends AbstractMinifier {
 				// We can't just remove all whitespace in the line, but we can ensure there's a maximum of one space in any run.
 				// https://github.com/logicsquad/minifier/issues/5
 				this.contents = this.contents.replaceAll("\\s{2,}", " ").trim();
-			} else {
-				String[] words = this.contents.split("\\s");
-				if (words.length == 1) {
-					if (!this.property.equalsIgnoreCase("animation-name")) {
-						this.contents = this.contents.toLowerCase();
-					}
-					this.contents = this.contents.replaceAll("('|\")?(.*?)\1", "$2");
-				}
 			}
 		}
 
@@ -792,12 +1057,15 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 		}
 
-		private void simplifyHexColours() {
+		private static String simplifyHexColours(String contents) {
 			StringBuffer newContents = new StringBuffer();
 
+			// The lookahead stops this matching the first six digits of an eight-digit
+			// (#rrggbbaa) colour.
 			Pattern pattern = Pattern
-					.compile("#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])");
-			Matcher matcher = pattern.matcher(this.contents);
+					.compile("#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])"
+							+ "(?![0-9a-fA-F])");
+			Matcher matcher = pattern.matcher(contents);
 
 			while (matcher.find()) {
 				if (matcher.group(1).equalsIgnoreCase(matcher.group(2))
@@ -811,7 +1079,7 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 			matcher.appendTail(newContents);
 
-			this.contents = newContents.toString();
+			return newContents.toString();
 		}
 
 		/**
@@ -827,7 +1095,7 @@ public class CSSMinifier extends AbstractMinifier {
 	/**
 	 * Exception representing an unterminated comment.
 	 */
-	private static class UnterminatedCommentException extends Exception {
+	static class UnterminatedCommentException extends Exception {
 		/**
 		 * Serial version UID
 		 */
