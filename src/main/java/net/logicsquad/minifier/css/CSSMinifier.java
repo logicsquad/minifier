@@ -162,18 +162,22 @@ public class CSSMinifier extends AbstractMinifier {
 						throw new UnbalancedBracesException();
 					}
 					if (j == 0) {
-						try {
-							selectors.add(new Selector(css.substring(n, i)));
-						} catch (UnterminatedSelectorException usex) {
-							LOG.debug("Unterminated selector: {}", usex.getMessage());
-						} catch (EmptySelectorBodyException ebex) {
-							LOG.debug("Empty selector body: {}", ebex.getMessage());
-						}
+						addSelector(selectors, css.substring(n, i));
 						n = i;
 					}
 				} else {
 					i++;
 				}
+			}
+			if (j > 0) {
+				// The input ends inside a rule that was never closed. Browsers close any
+				// blocks still open at the end of a stylesheet, so do the same.
+				StringBuilder rule = new StringBuilder(css.substring(n));
+				for (; j > 0; j--) {
+					rule.append('}');
+				}
+				addSelector(selectors, rule.toString());
+				n = css.length();
 			}
 
 			for (Selector selector : selectors) {
@@ -181,9 +185,7 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 			// Anything after the last rule, such as a retained comment or an @layer
 			// statement, has no rule to be output with, so output it here.
-			if (j == 0) {
-				pout.print(Selector.minifySelector(css.substring(n)));
-			}
+			pout.print(Selector.minifySelector(css.substring(n)));
 			pout.print("\r\n");
 			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
@@ -195,6 +197,24 @@ public class CSSMinifier extends AbstractMinifier {
 			} catch (IOException e) {
 				throw new MinificationException("Minification failed due to Exception.", e);
 			}
+		}
+	}
+
+	/**
+	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
+	 * rule that is unterminated or has an empty body is logged and skipped.
+	 *
+	 * @param selectors list to add the parsed rule to
+	 * @param rule      a whole rule, from its selector to its closing brace
+	 * @throws IncompleteSelectorException if {@code rule} has no opening brace
+	 */
+	private static void addSelector(List<Selector> selectors, String rule) throws IncompleteSelectorException {
+		try {
+			selectors.add(new Selector(rule));
+		} catch (UnterminatedSelectorException usex) {
+			LOG.debug("Unterminated selector: {}", usex.getMessage());
+		} catch (EmptySelectorBodyException ebex) {
+			LOG.debug("Empty selector body: {}", ebex.getMessage());
 		}
 	}
 
