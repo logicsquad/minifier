@@ -291,7 +291,10 @@ public class CSSMinifier extends AbstractMinifier {
 	 * retained comment is copied whole, so that the start of a comment inside it
 	 * isn't either. A string or {@code url()} token left open at the end of the input
 	 * is closed, as a browser closes it, and a line break that isn't inside a string,
-	 * {@code url()} token or retained comment becomes a space.
+	 * {@code url()} token or retained comment becomes a space. Where a comment is all
+	 * that keeps the tokens on either side of it apart, as it keeps "0" and "auto"
+	 * from running together into "0auto", it leaves a space in its place, or, in a
+	 * selector, where a space would be a descendant combinator, an empty comment.
 	 *
 	 * @param css the CSS to remove comments from
 	 * @return {@code css}, without any comments that aren't retained
@@ -299,6 +302,8 @@ public class CSSMinifier extends AbstractMinifier {
 	 */
 	private static String removeComments(String css) throws UnterminatedCommentException {
 		StringBuilder sb = new StringBuilder(css.length());
+		// Where in sb the current statement, declaration or rule prelude starts
+		int start = 0;
 		int i = 0;
 		while (i < css.length()) {
 			char c = css.charAt(i);
@@ -315,6 +320,8 @@ public class CSSMinifier extends AbstractMinifier {
 				// https://github.com/logicsquad/minifier/issues/4
 				if (css.startsWith("/**", i) && !css.startsWith("/**/", i)) {
 					sb.append(css, i, end + 2);
+				} else if (wouldJoin(sb, css, end + 2)) {
+					sb.append(inSelector(sb.substring(start), css, end + 2) ? "/**/" : " ");
 				}
 				i = end + 2;
 			} else if (c == '\n') {
@@ -324,9 +331,111 @@ public class CSSMinifier extends AbstractMinifier {
 			} else {
 				sb.append(c);
 				i++;
+				if (c == '{' || c == '}' || c == ';') {
+					start = sb.length();
+				}
 			}
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * Returns whether the last character of {@code sb} and the text at {@code i} in
+	 * {@code css} would run together into one token with nothing between them, as
+	 * "0" and "auto" would into the dimension "0auto". These are the pairs of tokens
+	 * that CSS Syntax says need a comment between them when serialized, worked out
+	 * from the characters on either side, so a few pairs that wouldn't run
+	 * together, such as a number and "(", are kept apart too.
+	 *
+	 * @param sb  the text in front of a removed comment
+	 * @param css the CSS that the comment was removed from
+	 * @param i   the index in {@code css} just past the comment
+	 * @return whether the text on either side of the comment would run together
+	 */
+	private static boolean wouldJoin(StringBuilder sb, String css, int i) {
+		if (sb.length() == 0 || i >= css.length()) {
+			return false;
+		}
+		char before = sb.charAt(sb.length() - 1);
+		char after = css.charAt(i);
+		boolean number = isDigit(after) || (after == '.' && i + 1 < css.length() && isDigit(css.charAt(i + 1)));
+		if (isNameChar(before)) {
+			// An ident, at-keyword, hash, number or dimension would run on into a name or
+			// an escape, and an ident into "(", making it a function. A number or "-"
+			// would also run on into a number such as ".5", and a number into "%".
+			return isNameChar(after) || after == '\\' || after == '('
+					|| ((isDigit(before) || before == '-') && number) || (isDigit(before) && after == '%');
+		}
+		switch (before) {
+		case '#':
+		case '@':
+			return isNameChar(after) || after == '\\';
+		case '.':
+			return isDigit(after);
+		case '+':
+			return number;
+		case '/':
+			// "/" and "*" would start a comment.
+			return after == '*';
+		default:
+			return false;
+		}
+	}
+
+	/**
+	 * Returns whether {@code i} in {@code css} is in a selector: that is, whether
+	 * the text it's in, which starts with {@code text}, is the prelude of a rule
+	 * other than an at-rule, rather than a statement or a declaration.
+	 *
+	 * @param text the text in front of {@code i}, from the start of the statement,
+	 *             declaration or rule prelude that it's in
+	 * @param css  the CSS being scanned
+	 * @param i    an index in {@code css}
+	 * @return whether {@code i} is in a selector
+	 */
+	private static boolean inSelector(String text, String css, int i) {
+		if (text.startsWith("@", Selector.preludeStart(text))) {
+			return false;
+		}
+		// A selector ends at "{", but a statement or declaration at ";" or "}".
+		while (i < css.length()) {
+			char c = css.charAt(i);
+			if (c == '"' || c == '\'') {
+				i = Selector.consumeString(css, i, null);
+			} else if (Selector.isUrlStart(css, i)) {
+				i = Selector.consumeUrl(css, i, null);
+			} else if (css.startsWith("/*", i)) {
+				i = Selector.consumeComment(css, i, null);
+			} else if (c == '{') {
+				return true;
+			} else if (c == ';' || c == '}') {
+				return false;
+			} else {
+				i++;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Returns whether {@code c} is an ASCII digit.
+	 *
+	 * @param c a character
+	 * @return whether {@code c} is an ASCII digit
+	 */
+	private static boolean isDigit(char c) {
+		return c >= '0' && c <= '9';
+	}
+
+	/**
+	 * Returns whether {@code c} can be part of a name, such as an ident: a letter,
+	 * digit, "_", "-", or any non-ASCII character.
+	 *
+	 * @param c a character
+	 * @return whether {@code c} can be part of a name
+	 */
+	private static boolean isNameChar(char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || isDigit(c) || c == '_' || c == '-' || c >= 0x80;
 	}
 
 	/**

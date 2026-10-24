@@ -1,0 +1,14 @@
+/* A comment is all that keeps the tokens on either side of each of these apart. */
+a { margin: 0/**/auto }
+b { background: #fff/* white */url(x.png) }
+c { border: 1px/**/solid/**/red }
+d { font: 12px/* size *//* family */Arial }
+@media screen/**/and/**/(min-width: 1px) { e { color: red } }
+li:nth-child(2n/**/of/**/.f) { color: red }
+/* In a selector, a space would be a descendant combinator, so an empty comment stays. */
+.nav/**/li { color: red }
+g { .nav/**/li { color: red } }
+/* Nothing needs to stay in place of these. */
+h1/**/.title, h2/**/+/**/p { color:/**/red/**/; }
+/* Rarer pairs that would run together. */
+h { --x: 1/**/.5 5/**/% #/**/f00 +/**/1 -/**/.5 @/**/a 1//**/*2 }
