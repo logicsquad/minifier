@@ -21,7 +21,7 @@ import net.logicsquad.minifier.Minifier;
  * @author paulh
  * @author Barry van Oudtshoorn
  */
-public class CSSMinifier implements Minifier {
+public final class CSSMinifier implements Minifier {
 	/**
 	 * Logger
 	 */

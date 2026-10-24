@@ -7,6 +7,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -129,6 +130,15 @@ public abstract class AbstractMinifierTest {
 			return s.substring(0, s.length() - 2);
 		}
 		return s.endsWith("\n") || s.endsWith("\r") ? s.substring(0, s.length() - 1) : s;
+	}
+
+	/**
+	 * Tests that the {@link Minifier} is final: nothing in it is meant to be
+	 * overridden.
+	 */
+	@Test
+	void minifierIsFinal() {
+		assertTrue(Modifier.isFinal(minifier().getClass().getModifiers()));
 	}
 
 	/**

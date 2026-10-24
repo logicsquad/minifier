@@ -17,7 +17,7 @@ import net.logicsquad.minifier.Minifier;
  * @author John Reilly
  * @author Douglas Crockford
  */
-public class JSMinifier implements Minifier {
+public final class JSMinifier implements Minifier {
 	/**
 	 * End of file
 	 */
