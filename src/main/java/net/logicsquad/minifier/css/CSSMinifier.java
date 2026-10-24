@@ -201,7 +201,8 @@ public class CSSMinifier extends AbstractMinifier {
 
 	/**
 	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
-	 * rule that is unterminated or has an empty body is logged and skipped.
+	 * rule that is unterminated, or has an empty body and isn't an {@code @layer}
+	 * block, is logged and skipped.
 	 *
 	 * @param selectors list to add the parsed rule to
 	 * @param rule      a whole rule, from its selector to its closing brace
@@ -288,7 +289,9 @@ public class CSSMinifier extends AbstractMinifier {
 			if (body.isEmpty() || body.charAt(body.length() - 1) != '}') {
 				throw new UnterminatedSelectorException(selector);
 			}
-			if (body.length() == 1) {
+			// An empty @layer block is the exception: it still declares its layer, which
+			// fixes where the layer comes in the layer order.
+			if (body.length() == 1 && !isLayerBlock(selector.substring(0, brace))) {
 				throw new EmptySelectorBodyException(selector);
 			}
 			LOG.debug("Parsing selector: {}", selector.substring(0, brace).trim());
@@ -586,6 +589,58 @@ public class CSSMinifier extends AbstractMinifier {
 				}
 			}
 			return -1;
+		}
+
+		/**
+		 * Returns {@code true} if {@code header}, the text in front of a rule's
+		 * opening brace, is the prelude of an {@code @layer} block. Any statements and
+		 * retained comments in front of the prelude, which are output with the rule,
+		 * are skipped. Strings, {@code url()} tokens and comments are skipped too, so
+		 * that a ";" inside one isn't taken for the end of a statement.
+		 *
+		 * @param header the text in front of a rule's opening brace
+		 * @return whether the rule is an {@code @layer} block
+		 */
+		private static boolean isLayerBlock(String header) {
+			// The prelude starts after the last statement...
+			int start = 0;
+			int i = 0;
+			while (i < header.length()) {
+				char c = header.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = consumeString(header, i, null);
+				} else if (isUrlStart(header, i)) {
+					i = consumeUrl(header, i, null);
+				} else if (header.startsWith("/*", i)) {
+					i = consumeComment(header, i, null);
+				} else {
+					i++;
+					if (c == ';') {
+						start = i;
+					}
+				}
+			}
+			// ...and after any whitespace and comments in front of it.
+			i = start;
+			while (i < header.length()) {
+				if (header.startsWith("/*", i)) {
+					i = consumeComment(header, i, null);
+				} else if (Character.isWhitespace(header.charAt(i))) {
+					i++;
+				} else {
+					break;
+				}
+			}
+			if (!header.regionMatches(true, i, "@layer", 0, 6)) {
+				return false;
+			}
+			// "@layer" must be the whole at-keyword, not the start of a longer one.
+			i += 6;
+			if (i < header.length()) {
+				char next = header.charAt(i);
+				return !(Character.isLetterOrDigit(next) || next == '-' || next == '_');
+			}
+			return true;
 		}
 
 		/**
