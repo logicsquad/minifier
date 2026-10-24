@@ -138,6 +138,9 @@ public class CSSMinifier extends AbstractMinifier {
 			String css = removeComments(String.join("\n", lines));
 			LOG.debug("Parsing and processing selectors...");
 			List<Selector> selectors = new ArrayList<>();
+			// When a rule is skipped, the statements and retained comments in front of it
+			// are kept, and output in front of whatever comes next.
+			String pending = "";
 			// Scan for top-level rules, skipping strings, url() tokens and (retained)
 			// comments so that braces inside them are not mistaken for rule boundaries.
 			n = 0;
@@ -161,7 +164,7 @@ public class CSSMinifier extends AbstractMinifier {
 						throw new UnbalancedBracesException();
 					}
 					if (j == 0) {
-						addSelector(selectors, css.substring(n, i));
+						pending = addSelector(selectors, pending + css.substring(n, i));
 						n = i;
 					}
 				} else {
@@ -171,11 +174,11 @@ public class CSSMinifier extends AbstractMinifier {
 			if (j > 0) {
 				// The input ends inside a rule that was never closed. Browsers close any
 				// blocks still open at the end of a stylesheet, so do the same.
-				StringBuilder rule = new StringBuilder(css.substring(n));
+				StringBuilder rule = new StringBuilder(pending + css.substring(n));
 				for (; j > 0; j--) {
 					rule.append('}');
 				}
-				addSelector(selectors, rule.toString());
+				pending = addSelector(selectors, rule.toString());
 				n = css.length();
 			}
 
@@ -183,8 +186,9 @@ public class CSSMinifier extends AbstractMinifier {
 				pout.print(selector.toString());
 			}
 			// Anything after the last rule, such as a retained comment or an @layer
-			// statement, has no rule to be output with, so output it here.
-			pout.print(Selector.minifySelector(css.substring(n)));
+			// statement, has no rule to be output with, so output it here, along with
+			// anything still pending from a rule that was skipped.
+			pout.print(Selector.minifySelector(pending + css.substring(n)));
 			pout.print("\r\n");
 			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
@@ -202,20 +206,27 @@ public class CSSMinifier extends AbstractMinifier {
 	/**
 	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
 	 * rule that is unterminated, or has an empty body and isn't an {@code @layer}
-	 * block, is logged and skipped.
+	 * block, is logged and skipped, but not the statements and retained comments in
+	 * front of it: they're returned, to be output in front of whatever comes next.
 	 *
 	 * @param selectors list to add the parsed rule to
-	 * @param rule      a whole rule, from its selector to its closing brace
+	 * @param rule      a whole rule, from any statements and retained comments in
+	 *                  front of it to its closing brace
+	 * @return the statements and retained comments in front of {@code rule} if it
+	 *         was skipped, or an empty string if it was added
 	 * @throws IncompleteSelectorException if {@code rule} has no opening brace
 	 */
-	private static void addSelector(List<Selector> selectors, String rule) throws IncompleteSelectorException {
+	private static String addSelector(List<Selector> selectors, String rule) throws IncompleteSelectorException {
 		try {
 			selectors.add(new Selector(rule));
+			return "";
 		} catch (UnterminatedSelectorException usex) {
 			LOG.debug("Unterminated selector: {}", usex.getMessage());
 		} catch (EmptySelectorBodyException ebex) {
 			LOG.debug("Empty selector body: {}", ebex.getMessage());
 		}
+		String header = rule.substring(0, Selector.openingBrace(rule));
+		return header.substring(0, Selector.preludeStart(header));
 	}
 
 	/**
@@ -592,16 +603,15 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 
 		/**
-		 * Returns {@code true} if {@code header}, the text in front of a rule's
-		 * opening brace, is the prelude of an {@code @layer} block. Any statements and
-		 * retained comments in front of the prelude, which are output with the rule,
-		 * are skipped. Strings, {@code url()} tokens and comments are skipped too, so
-		 * that a ";" inside one isn't taken for the end of a statement.
+		 * Returns the index in {@code header}, the text in front of a rule's opening
+		 * brace, at which the rule's own prelude starts, after any statements and
+		 * retained comments in front of it. Strings, {@code url()} tokens and comments
+		 * are skipped, so that a ";" inside one isn't taken for the end of a statement.
 		 *
 		 * @param header the text in front of a rule's opening brace
-		 * @return whether the rule is an {@code @layer} block
+		 * @return the index at which the rule's prelude starts
 		 */
-		private static boolean isLayerBlock(String header) {
+		private static int preludeStart(String header) {
 			// The prelude starts after the last statement...
 			int start = 0;
 			int i = 0;
@@ -631,6 +641,19 @@ public class CSSMinifier extends AbstractMinifier {
 					break;
 				}
 			}
+			return i;
+		}
+
+		/**
+		 * Returns {@code true} if {@code header}, the text in front of a rule's
+		 * opening brace, is the prelude of an {@code @layer} block, after any
+		 * statements and retained comments in front of it.
+		 *
+		 * @param header the text in front of a rule's opening brace
+		 * @return whether the rule is an {@code @layer} block
+		 */
+		private static boolean isLayerBlock(String header) {
+			int i = preludeStart(header);
 			if (!header.regionMatches(true, i, "@layer", 0, 6)) {
 				return false;
 			}

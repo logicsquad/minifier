@@ -1,0 +1,11 @@
+@import url("theme.css");
+.unused {}
+/** Kept, although the rule after it is empty. */
+.empty {}
+@layer base, theme;
+.also-empty {}
+.still-empty {}
+@layer theme { a { color: red } }
+@layer base { a { color: blue } }
+@layer overrides;
+.last {}
