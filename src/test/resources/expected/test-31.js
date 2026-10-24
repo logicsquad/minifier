@@ -1,0 +1,10 @@
+a=1
+!function(){}()
+a=1
+~function(){}()
+x=1
+'abc'.length
+x=1
+"abc".length
+x=`a`
+y=1

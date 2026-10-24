@@ -49,6 +49,24 @@ public class JSMinifierTest extends AbstractMinifierTest {
 		return;
 	}
 
+	@Test
+	public void unterminatedRegExpLiteralClassThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-regexp-class.js", "Unterminated regular expression literal", 2, 10);
+		return;
+	}
+
+	@Test
+	public void unterminatedTemplateLiteralThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-template.js", "Unterminated string literal", 2, 9);
+		return;
+	}
+
+	@Test
+	public void unterminatedSubstitutionThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-substitution.js", "Unterminated string literal", 2, 9);
+		return;
+	}
+
 	/**
 	 * Tests that "\r\n" and "\r" each count as one line break in where a problem
 	 * is reported.
@@ -60,6 +78,19 @@ public class JSMinifierTest extends AbstractMinifierTest {
 	}
 
 	/**
+	 * Tests that a line continuation in a string works with each kind of line
+	 * break: "\r\n" is one line break, not two.
+	 *
+	 * @throws MinificationException if minification fails
+	 */
+	@Test
+	public void lineContinuationWorksWithEachLineBreak() throws MinificationException {
+		assertEquals("s='abc\\\ndef';", new JSMinifier().minify("s = 'abc\\\ndef';"));
+		assertEquals("s='abc\\\ndef';", new JSMinifier().minify("s = 'abc\\\r\ndef';"));
+		assertEquals("s='abc\\\ndef';", new JSMinifier().minify("s = 'abc\\\rdef';"));
+	}
+
+	/**
 	 * Tests that input ending in "/" gains nothing at the end. Looking past the
 	 * end of the input once added U+FFFF to the output.
 	 *
@@ -68,6 +99,7 @@ public class JSMinifierTest extends AbstractMinifierTest {
 	@Test
 	public void trailingSlashGainsNothing() throws MinificationException {
 		assertEquals("a=b/", new JSMinifier().minify("a = b /"));
+		assertEquals("if(x)/re/", new JSMinifier().minify("if (x) /re/"));
 	}
 
 	/**
