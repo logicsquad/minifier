@@ -3,6 +3,30 @@
 The format here is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7] - 2026-10-25
+### Fixed
+- Fixed JavaScript operators running together, which could change
+  what they mean: `b + ++c` became `b+++c`, which is `(b++) + c`. #40
+- Fixed tabs in JavaScript strings, regular expressions and template
+  literals becoming spaces, and line continuations in strings failing
+  with `\r\n` line breaks. #41
+- Fixed template literals that span lines, which failed to minify, and
+  template literals nested in a substitution, which were minified as
+  code. #42
+- Fixed JavaScript statements that only a line break separates
+  running together, before `!`, `~` or a string, or after a template
+  literal. #43
+- Fixed a regular expression literal running into the word after it,
+  which was then read as its flags. #44
+- Fixed a `/` in a character class ending a regular expression
+  literal. #45
+- Fixed regular expression literals being taken for division, as
+  after `return`, `=>` or the condition of an `if`, and division at
+  the start of a line being taken for a regular expression literal.
+  #46
+- Fixed U+FFFF being added to the end of JavaScript that ends in `/`.
+  #47
+
 ## [1.6] - 2026-10-24
 ### Changed
 - Updated `central-publishing-maven-plugin` to 0.12.0, since Maven
