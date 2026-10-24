@@ -251,8 +251,9 @@ public final class CSSMinifier implements Minifier {
 	}
 
 	/**
-	 * Returns {@code css} with its comments removed, apart from "Javadoc-style"
-	 * comments, which are retained. Strings and {@code url()} tokens are skipped, so
+	 * Returns {@code css} with its comments removed, apart from those that start
+	 * with "/*!", which mark a licence or copyright notice, and are retained.
+	 * Strings and {@code url()} tokens are skipped, so
 	 * that the start of a comment inside one isn't taken for a comment, and a
 	 * retained comment is copied whole, so that the start of a comment inside it
 	 * isn't either. A string or {@code url()} token left open at the end of the input
@@ -287,9 +288,7 @@ public final class CSSMinifier implements Minifier {
 				if (end == -1) {
 					throw new MinificationException("Unterminated comment", css, i);
 				}
-				// Here we retain "Javadoc-style" comments. We're looking for "/**", but need to exclude "/**/".
-				// https://github.com/logicsquad/minifier/issues/4
-				if (css.startsWith("/**", i) && !css.startsWith("/**/", i)) {
+				if (css.startsWith("/*!", i)) {
 					sb.append(css, i, end + 2);
 				} else if (wouldJoin(sb, css, end + 2)) {
 					sb.append(inSelector(sb.substring(start), css, end + 2) ? "/**/" : " ");
@@ -837,6 +836,14 @@ public final class CSSMinifier implements Minifier {
 			Property property = Property.parse(declaration);
 			if (property != null) {
 				this.contents.add(property);
+			} else {
+				// An incomplete declaration is skipped, but not the retained comments in
+				// front of it, such as one after the last declaration.
+				String text = declaration.trim();
+				String comments = text.substring(0, Property.afterComments(text)).trim();
+				if (!comments.isEmpty()) {
+					this.contents.add(comments);
+				}
 			}
 		}
 
@@ -884,13 +891,7 @@ public final class CSSMinifier implements Minifier {
 			// Retained comments in front of the declaration are kept in front of it,
 			// unchanged, rather than being parsed as part of the property name.
 			String property = declaration.trim();
-			int start = 0;
-			while (property.startsWith("/*", start)) {
-				start = Selector.consumeComment(property, start, null);
-				while (start < property.length() && Character.isWhitespace(property.charAt(start))) {
-					start++;
-				}
-			}
+			int start = afterComments(property);
 			String comments = property.substring(0, start).trim();
 			property = property.substring(start);
 
@@ -919,6 +920,25 @@ public final class CSSMinifier implements Minifier {
 				return null;
 			}
 			return new Property(comments, parts.get(0), parts.get(1));
+		}
+
+		/**
+		 * Returns the index in {@code declaration} at which the retained comments in
+		 * front of it, and any whitespace after them, end.
+		 *
+		 * @param declaration a declaration, without whitespace in front of it
+		 * @return the index of what follows the retained comments in front of
+		 *         {@code declaration}
+		 */
+		static int afterComments(String declaration) {
+			int start = 0;
+			while (declaration.startsWith("/*", start)) {
+				start = Selector.consumeComment(declaration, start, null);
+				while (start < declaration.length() && Character.isWhitespace(declaration.charAt(start))) {
+					start++;
+				}
+			}
+			return start;
 		}
 
 		/**

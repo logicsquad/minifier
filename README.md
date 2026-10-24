@@ -47,6 +47,10 @@ A `MinificationException` says what went wrong, and where: its message
 is something like `Unterminated comment at line 12, column 5`, and
 `line()` and `column()` return the position, both numbered from 1.
 
+Comments are removed, apart from those that start with `/*!`, which
+mark a licence or copyright notice by convention: those are kept, where
+they are.
+
 Using Minifier
 --------------
 You can use Minifier in your projects by including it as a Maven

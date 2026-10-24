@@ -5,6 +5,6 @@
     @layer extra;
 }
 @media screen {
-    /** Kept with the statement after it. */
+    /*! Kept with the statement after it. */
     @layer print, screen;
 }

@@ -38,6 +38,12 @@ public class JSMinifierTest extends AbstractMinifierTest {
 	}
 
 	@Test
+	public void unterminatedKeptCommentThrowsException() {
+		throwsOnMinifySource("var a = 1;\n/*! Licence", "Unterminated comment", 2, 1);
+		return;
+	}
+
+	@Test
 	public void unterminatedStringLiteralThrowsException() throws IOException {
 		throwsOnMinify("exceptions/unterminated-string.js", "Unterminated string literal", 2, 9);
 		return;

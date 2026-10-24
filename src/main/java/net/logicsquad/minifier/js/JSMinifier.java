@@ -36,9 +36,8 @@ public final class JSMinifier implements Minifier {
 	private static final Set<String> CONDITIONS = new HashSet<>(Arrays.asList("for", "if", "while", "with"));
 
 	/**
-	 * Number of characters of output that {@link Minification#regExpCanFollow()}
-	 * looks at, enough for the longest of {@link #KEYWORDS} and the character in
-	 * front of it
+	 * Number of characters {@link Minification#written} holds, enough for the
+	 * longest of {@link #KEYWORDS} and the character in front of it
 	 */
 	private static final int LOOKBEHIND = 16;
 
@@ -84,7 +83,8 @@ public final class JSMinifier implements Minifier {
 	 * </p>
 	 *
 	 * <ul>
-	 * <li>comments will be removed;</li>
+	 * <li>comments will be removed, apart from those that start with "/*!", which
+	 * mark a licence or copyright notice;</li>
 	 * <li>tabs will be replaced with spaces;</li>
 	 * <li>carriage returns will be replaced with linefeeds; and</li>
 	 * <li>most spaces and linefeeds will be removed.</li>
@@ -208,6 +208,18 @@ public final class JSMinifier implements Minifier {
 		private boolean afterCondition;
 
 		/**
+		 * The last characters written, apart from kept comments, for seeing what
+		 * comes before a "/" or "("
+		 */
+		private final StringBuilder written = new StringBuilder(LOOKBEHIND);
+
+		/**
+		 * Comments that start with "/*!", read since {@link #theA}, to be written
+		 * after it
+		 */
+		private final StringBuilder keptComments = new StringBuilder();
+
+		/**
 		 * Constructor taking the source to minify.
 		 *
 		 * @param in source to minify
@@ -267,8 +279,9 @@ public final class JSMinifier implements Minifier {
 		/**
 		 * Returns the next character from {@link #in}, <em>excluding comments</em>:
 		 * a block comment is returned as a space, and a line comment as the line
-		 * break that ends it. The character is also remembered in {@link #theX}, and
-		 * the one before it in {@link #theY}.
+		 * break that ends it. A comment that starts with "/*!" is also kept, in
+		 * {@link #keptComments}. The character is also remembered in {@link #theX},
+		 * and the one before it in {@link #theY}.
 		 *
 		 * @return next character (excluding comments)
 		 * @throws MinificationException if comment was unterminated
@@ -285,6 +298,11 @@ public final class JSMinifier implements Minifier {
 					break;
 				case '*':
 					get();
+					if (peek() == '!') {
+						keepComment(start);
+						c = ' ';
+						break;
+					}
 					while (c != ' ') {
 						switch (get()) {
 						case '*':
@@ -306,12 +324,47 @@ public final class JSMinifier implements Minifier {
 		}
 
 		/**
-		 * Appends {@code c} to the output.
+		 * Reads the rest of a comment that starts with "/*!", which marks a licence
+		 * or copyright notice, into {@link #keptComments}, as it is.
+		 *
+		 * @param start index in {@link #in} of the comment's "/"
+		 * @throws MinificationException if the comment is unterminated
+		 */
+		private void keepComment(int start) throws MinificationException {
+			keptComments.append("/*");
+			for (;;) {
+				int c = read();
+				if (c == EOF) {
+					throw new MinificationException("Unterminated comment", in, start);
+				}
+				keptComments.append((char) c);
+				if (c == '*' && peek() == '/') {
+					keptComments.append((char) read());
+					return;
+				}
+			}
+		}
+
+		/**
+		 * Appends {@code c} to the output, and remembers it in {@link #written}.
 		 *
 		 * @param c a character
 		 */
 		private void write(int c) {
 			out.append((char) c);
+			if (written.length() == LOOKBEHIND) {
+				written.deleteCharAt(0);
+			}
+			written.append((char) c);
+		}
+
+		/**
+		 * Appends any {@link #keptComments} to the output, but not to
+		 * {@link #written}, since they aren't code.
+		 */
+		private void writeKeptComments() {
+			out.append(keptComments);
+			keptComments.setLength(0);
 		}
 
 		/**
@@ -329,8 +382,7 @@ public final class JSMinifier implements Minifier {
 			if (afterRegExp) {
 				return false;
 			}
-			StringBuilder before = new StringBuilder(LOOKBEHIND + 1);
-			before.append(out, Math.max(0, out.length() - LOOKBEHIND), out.length());
+			StringBuilder before = new StringBuilder(written);
 			if (theA != ' ' && theA != '\n') {
 				before.append((char) theA);
 			}
@@ -388,6 +440,8 @@ public final class JSMinifier implements Minifier {
 					write(theY);
 				}
 			case COPY_GET:
+				// Comments kept after A go here, whether or not A was written.
+				writeKeptComments();
 				afterRegExp = afterRegExp && (theB == ' ' || theB == '\n');
 				afterCondition = afterCondition && (theB == ' ' || theB == '\n');
 				theA = theB;
@@ -417,11 +471,11 @@ public final class JSMinifier implements Minifier {
 				} else if (theA == '}') {
 					depth--;
 				} else if (theA == '(') {
-					int end = out.length();
-					while (end > 0 && (out.charAt(end - 1) == ' ' || out.charAt(end - 1) == '\n')) {
+					int end = written.length();
+					while (end > 0 && (written.charAt(end - 1) == ' ' || written.charAt(end - 1) == '\n')) {
 						end--;
 					}
-					parentheses.push(CONDITIONS.contains(wordBefore(out, end)));
+					parentheses.push(CONDITIONS.contains(wordBefore(written, end)));
 				} else if (theA == ')') {
 					afterCondition = !parentheses.isEmpty() && parentheses.pop();
 				}
@@ -434,6 +488,7 @@ public final class JSMinifier implements Minifier {
 					if (theA != ' ') {
 						write(theA);
 					}
+					writeKeptComments();
 					// Keep "/" and "*" apart from the "/", as "/ /" would run together into "//".
 					if (theA == '/' || theA == '*') {
 						write(' ');
