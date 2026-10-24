@@ -63,6 +63,13 @@ public class JSMinifier extends AbstractMinifier {
 	private final Deque<Integer> substitutions = new ArrayDeque<>();
 
 	/**
+	 * Whether {@link #theA} is the "/" that ends a regular expression literal,
+	 * which whitespace has to keep apart from a word after it, as it would an
+	 * identifier: in {@code /re/in}, "in" would be the literal's flags
+	 */
+	private boolean theAEndsRegExp;
+
+	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
 	 *
 	 * @param reader a {@link Reader}
@@ -244,6 +251,7 @@ public class JSMinifier extends AbstractMinifier {
 			}
 		case COPY_GET:
 			theA = theB;
+			theAEndsRegExp = false;
 			if (theA == '\'' || theA == '"') {
 				for (;;) {
 					out.write(theA);
@@ -288,6 +296,7 @@ public class JSMinifier extends AbstractMinifier {
 					}
 					out.write(theA);
 				}
+				theAEndsRegExp = true;
 				theB = next();
 			}
 			break;
@@ -389,7 +398,7 @@ public class JSMinifier extends AbstractMinifier {
 				default:
 					switch (theB) {
 					case ' ':
-						if (isAlphanum(theA)) {
+						if (isAlphanum(theA) || theAEndsRegExp) {
 							action(Action.OUTPUT_COPY_GET, writer);
 							break;
 						}
@@ -408,7 +417,7 @@ public class JSMinifier extends AbstractMinifier {
 							action(Action.OUTPUT_COPY_GET, writer);
 							break;
 						default:
-							if (isAlphanum(theA)) {
+							if (isAlphanum(theA) || theAEndsRegExp) {
 								action(Action.OUTPUT_COPY_GET, writer);
 							} else {
 								action(Action.GET, writer);
