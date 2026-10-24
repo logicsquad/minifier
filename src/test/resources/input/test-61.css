@@ -1,0 +1,5 @@
+.a { margin-left: 5px; margin: 0 }
+.b { background-color: red; background: none }
+.c { font-weight: bold; font: 12px Arial }
+.d { color: red; & { color: blue } }
+.e { color: red; .f { color: blue } margin: 0 }

@@ -105,6 +105,12 @@ public class CSSMinifier extends AbstractMinifier {
 			"border-image-repeat"));
 
 	/**
+	 * An {@code @charset} statement in the only form that browsers honour, which they
+	 * only do at the very start of a stylesheet
+	 */
+	private static final Pattern HONOURED_CHARSET = Pattern.compile("@charset \"[^\";]*\";");
+
+	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
 	 *
 	 * @param reader a {@link Reader}
@@ -134,10 +140,19 @@ public class CSSMinifier extends AbstractMinifier {
 				lines.add(s);
 			}
 
+			String input = String.join("\n", lines);
 			LOG.debug("Removing comments...");
-			String css = removeComments(String.join("\n", lines));
+			String css = removeComments(input);
 			LOG.debug("Parsing and processing selectors...");
 			List<Selector> selectors = new ArrayList<>();
+			// When a rule is skipped, the statements and retained comments in front of it
+			// are kept, and output in front of whatever comes next.
+			String pending = "";
+			// An @import or @namespace statement that comes after a rule is invalid, so an
+			// empty rule in front of one is kept: dropping it could make the statement
+			// valid. This finds the last mention of either, even in a string or comment,
+			// which at worst keeps an empty rule that could have been dropped.
+			int lastImport = lastImportOrNamespace(css);
 			// Scan for top-level rules, skipping strings, url() tokens and (retained)
 			// comments so that braces inside them are not mistaken for rule boundaries.
 			n = 0;
@@ -161,7 +176,7 @@ public class CSSMinifier extends AbstractMinifier {
 						throw new UnbalancedBracesException();
 					}
 					if (j == 0) {
-						addSelector(selectors, css.substring(n, i));
+						pending = addSelector(selectors, pending + css.substring(n, i), i <= lastImport);
 						n = i;
 					}
 				} else {
@@ -171,20 +186,23 @@ public class CSSMinifier extends AbstractMinifier {
 			if (j > 0) {
 				// The input ends inside a rule that was never closed. Browsers close any
 				// blocks still open at the end of a stylesheet, so do the same.
-				StringBuilder rule = new StringBuilder(css.substring(n));
+				StringBuilder rule = new StringBuilder(pending + css.substring(n));
 				for (; j > 0; j--) {
 					rule.append('}');
 				}
-				addSelector(selectors, rule.toString());
+				pending = addSelector(selectors, rule.toString(), false); // nothing comes after it
 				n = css.length();
 			}
 
+			StringBuilder output = new StringBuilder();
 			for (Selector selector : selectors) {
-				pout.print(selector.toString());
+				output.append(selector);
 			}
 			// Anything after the last rule, such as a retained comment or an @layer
-			// statement, has no rule to be output with, so output it here.
-			pout.print(Selector.minifySelector(css.substring(n)));
+			// statement, has no rule to be output with, so output it here, along with
+			// anything still pending from a rule that was skipped.
+			output.append(Selector.minifySelector(pending + css.substring(n)));
+			pout.print(withoutIgnoredCharset(output.toString(), input));
 			pout.print("\r\n");
 			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
@@ -201,20 +219,69 @@ public class CSSMinifier extends AbstractMinifier {
 
 	/**
 	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
-	 * rule that is unterminated or has an empty body is logged and skipped.
+	 * rule that is unterminated is logged and skipped, as is one with an empty body,
+	 * unless it's an {@code @layer} block or {@code keepEmpty} is set. The statements
+	 * and retained comments in front of a skipped rule aren't skipped, though:
+	 * they're returned, to be output in front of whatever comes next.
 	 *
 	 * @param selectors list to add the parsed rule to
-	 * @param rule      a whole rule, from its selector to its closing brace
+	 * @param rule      a whole rule, from any statements and retained comments in
+	 *                  front of it to its closing brace
+	 * @param keepEmpty whether to keep {@code rule} even if its body is empty
+	 * @return the statements and retained comments in front of {@code rule} if it
+	 *         was skipped, or an empty string if it was added
 	 * @throws IncompleteSelectorException if {@code rule} has no opening brace
 	 */
-	private static void addSelector(List<Selector> selectors, String rule) throws IncompleteSelectorException {
+	private static String addSelector(List<Selector> selectors, String rule, boolean keepEmpty)
+			throws IncompleteSelectorException {
 		try {
-			selectors.add(new Selector(rule));
+			selectors.add(new Selector(rule, keepEmpty));
+			return "";
 		} catch (UnterminatedSelectorException usex) {
 			LOG.debug("Unterminated selector: {}", usex.getMessage());
 		} catch (EmptySelectorBodyException ebex) {
 			LOG.debug("Empty selector body: {}", ebex.getMessage());
 		}
+		String header = rule.substring(0, Selector.openingBrace(rule));
+		return header.substring(0, Selector.preludeStart(header));
+	}
+
+	/**
+	 * Returns the index of the last "@import" or "@namespace" in {@code css},
+	 * ignoring case, or -1 if there is neither.
+	 *
+	 * @param css the CSS to search
+	 * @return the index of the last "@import" or "@namespace", or -1
+	 */
+	private static int lastImportOrNamespace(String css) {
+		for (int i = css.lastIndexOf('@'); i >= 0; i = css.lastIndexOf('@', i - 1)) {
+			if (css.regionMatches(true, i, "@import", 0, 7) || css.regionMatches(true, i, "@namespace", 0, 10)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * Returns {@code output} without any {@code @charset} statements at its start
+	 * that {@code input} doesn't start with. Browsers only honour {@code @charset}
+	 * at the very start of a stylesheet, written exactly as {@code @charset "name";},
+	 * and ignore it anywhere else, so one that minifying has moved to the start, or
+	 * rewritten into that form, would change how they decode the stylesheet. Since
+	 * browsers ignored it, dropping it changes nothing.
+	 *
+	 * @param output the minified stylesheet
+	 * @param input  the stylesheet before minifying
+	 * @return {@code output}, without any {@code @charset} statements at its start
+	 *         that {@code input} doesn't start with
+	 */
+	private static String withoutIgnoredCharset(String output, String input) {
+		Matcher m = HONOURED_CHARSET.matcher(output);
+		while (m.lookingAt() && !input.startsWith(m.group())) {
+			output = output.substring(m.end());
+			m = HONOURED_CHARSET.matcher(output);
+		}
+		return output;
 	}
 
 	/**
@@ -224,7 +291,10 @@ public class CSSMinifier extends AbstractMinifier {
 	 * retained comment is copied whole, so that the start of a comment inside it
 	 * isn't either. A string or {@code url()} token left open at the end of the input
 	 * is closed, as a browser closes it, and a line break that isn't inside a string,
-	 * {@code url()} token or retained comment becomes a space.
+	 * {@code url()} token or retained comment becomes a space. Where a comment is all
+	 * that keeps the tokens on either side of it apart, as it keeps "0" and "auto"
+	 * from running together into "0auto", it leaves a space in its place, or, in a
+	 * selector, where a space would be a descendant combinator, an empty comment.
 	 *
 	 * @param css the CSS to remove comments from
 	 * @return {@code css}, without any comments that aren't retained
@@ -232,6 +302,8 @@ public class CSSMinifier extends AbstractMinifier {
 	 */
 	private static String removeComments(String css) throws UnterminatedCommentException {
 		StringBuilder sb = new StringBuilder(css.length());
+		// Where in sb the current statement, declaration or rule prelude starts
+		int start = 0;
 		int i = 0;
 		while (i < css.length()) {
 			char c = css.charAt(i);
@@ -248,6 +320,8 @@ public class CSSMinifier extends AbstractMinifier {
 				// https://github.com/logicsquad/minifier/issues/4
 				if (css.startsWith("/**", i) && !css.startsWith("/**/", i)) {
 					sb.append(css, i, end + 2);
+				} else if (wouldJoin(sb, css, end + 2)) {
+					sb.append(inSelector(sb.substring(start), css, end + 2) ? "/**/" : " ");
 				}
 				i = end + 2;
 			} else if (c == '\n') {
@@ -257,27 +331,132 @@ public class CSSMinifier extends AbstractMinifier {
 			} else {
 				sb.append(c);
 				i++;
+				if (c == '{' || c == '}' || c == ';') {
+					start = sb.length();
+				}
 			}
 		}
 		return sb.toString();
 	}
 
 	/**
+	 * Returns whether the last character of {@code sb} and the text at {@code i} in
+	 * {@code css} would run together into one token with nothing between them, as
+	 * "0" and "auto" would into the dimension "0auto". These are the pairs of tokens
+	 * that CSS Syntax says need a comment between them when serialized, worked out
+	 * from the characters on either side, so a few pairs that wouldn't run
+	 * together, such as a number and "(", are kept apart too.
+	 *
+	 * @param sb  the text in front of a removed comment
+	 * @param css the CSS that the comment was removed from
+	 * @param i   the index in {@code css} just past the comment
+	 * @return whether the text on either side of the comment would run together
+	 */
+	private static boolean wouldJoin(StringBuilder sb, String css, int i) {
+		if (sb.length() == 0 || i >= css.length()) {
+			return false;
+		}
+		char before = sb.charAt(sb.length() - 1);
+		char after = css.charAt(i);
+		boolean number = isDigit(after) || (after == '.' && i + 1 < css.length() && isDigit(css.charAt(i + 1)));
+		if (isNameChar(before)) {
+			// An ident, at-keyword, hash, number or dimension would run on into a name or
+			// an escape, and an ident into "(", making it a function. A number or "-"
+			// would also run on into a number such as ".5", and a number into "%".
+			return isNameChar(after) || after == '\\' || after == '('
+					|| ((isDigit(before) || before == '-') && number) || (isDigit(before) && after == '%');
+		}
+		switch (before) {
+		case '#':
+		case '@':
+			return isNameChar(after) || after == '\\';
+		case '.':
+			return isDigit(after);
+		case '+':
+			return number;
+		case '/':
+			// "/" and "*" would start a comment.
+			return after == '*';
+		default:
+			return false;
+		}
+	}
+
+	/**
+	 * Returns whether {@code i} in {@code css} is in a selector: that is, whether
+	 * the text it's in, which starts with {@code text}, is the prelude of a rule
+	 * other than an at-rule, rather than a statement or a declaration.
+	 *
+	 * @param text the text in front of {@code i}, from the start of the statement,
+	 *             declaration or rule prelude that it's in
+	 * @param css  the CSS being scanned
+	 * @param i    an index in {@code css}
+	 * @return whether {@code i} is in a selector
+	 */
+	private static boolean inSelector(String text, String css, int i) {
+		if (text.startsWith("@", Selector.preludeStart(text))) {
+			return false;
+		}
+		// A selector ends at "{", but a statement or declaration at ";" or "}".
+		while (i < css.length()) {
+			char c = css.charAt(i);
+			if (c == '"' || c == '\'') {
+				i = Selector.consumeString(css, i, null);
+			} else if (Selector.isUrlStart(css, i)) {
+				i = Selector.consumeUrl(css, i, null);
+			} else if (css.startsWith("/*", i)) {
+				i = Selector.consumeComment(css, i, null);
+			} else if (c == '{') {
+				return true;
+			} else if (c == ';' || c == '}') {
+				return false;
+			} else {
+				i++;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Returns whether {@code c} is an ASCII digit.
+	 *
+	 * @param c a character
+	 * @return whether {@code c} is an ASCII digit
+	 */
+	private static boolean isDigit(char c) {
+		return c >= '0' && c <= '9';
+	}
+
+	/**
+	 * Returns whether {@code c} can be part of a name, such as an ident: a letter,
+	 * digit, "_", "-", or any non-ASCII character.
+	 *
+	 * @param c a character
+	 * @return whether {@code c} can be part of a name
+	 */
+	private static boolean isNameChar(char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || isDigit(c) || c == '_' || c == '-' || c >= 0x80;
+	}
+
+	/**
 	 * Represents a CSS selector.
 	 */
 	private static class Selector {
-		private Property[] properties = null;
-		private List<Selector> subSelectors = null;
+		// The rule's contents, in their original order: declarations (each a Property),
+		// nested rules (each a Selector) and statements (each a String, such as
+		// "@layer a,b;")
+		private final List<Object> contents = new ArrayList<>();
 		private String selector;
 
 		/**
 		 * Creates a new Selector using the supplied strings.
 		 *
-		 * @param selector The selector; for example, "div { border: solid 1px red;
-		 *                 color: blue; }"
+		 * @param selector  The selector; for example, "div { border: solid 1px red;
+		 *                  color: blue; }"
+		 * @param keepEmpty whether to keep the selector even if its body is empty
 		 * @throws Exception If the selector is incomplete and cannot be parsed.
 		 */
-		public Selector(String selector)
+		public Selector(String selector, boolean keepEmpty)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
 			int brace = openingBrace(selector);
 			if (brace < 0) {
@@ -288,7 +467,10 @@ public class CSSMinifier extends AbstractMinifier {
 			if (body.isEmpty() || body.charAt(body.length() - 1) != '}') {
 				throw new UnterminatedSelectorException(selector);
 			}
-			if (body.length() == 1) {
+			// The caller can ask for an empty rule to be kept, and an empty @layer block
+			// always is: it still declares its layer, which fixes where the layer comes in
+			// the layer order.
+			if (body.length() == 1 && !keepEmpty && !isLayerBlock(selector.substring(0, brace))) {
 				throw new EmptySelectorBodyException(selector);
 			}
 			LOG.debug("Parsing selector: {}", selector.substring(0, brace).trim());
@@ -312,8 +494,8 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Initialises this Selector from its (raw) header and its body, parsing the
-		 * body into nested selectors and/or properties. Handles arbitrarily deep CSS
-		 * nesting via recursion.
+		 * body into its contents: declarations, nested selectors and statements, in
+		 * their original order. Handles arbitrarily deep CSS nesting via recursion.
 		 *
 		 * @param header the raw selector text
 		 * @param body   the selector body, without its enclosing braces
@@ -326,8 +508,6 @@ public class CSSMinifier extends AbstractMinifier {
 			if (body.endsWith(";")) {
 				body = body.substring(0, body.length() - 1);
 			}
-			this.subSelectors = new ArrayList<>();
-			List<Property> props = new ArrayList<>();
 			StringBuilder pending = new StringBuilder();
 			int i = 0;
 			while (i < body.length()) {
@@ -345,14 +525,14 @@ public class CSSMinifier extends AbstractMinifier {
 					// inside it is mistaken for a boundary.
 					i = consumeComment(body, i, pending);
 				} else if (c == '{') {
-					// A nested rule starts here. Declarations were flushed at their ';',
-					// so "pending" now holds only this nested selector's header.
+					// A nested rule starts here. Declarations and statements were flushed at
+					// their ';', so "pending" now holds only this nested selector's header.
 					int j = matchingBrace(body, i);
-					this.subSelectors.add(new Selector(pending.toString(), body.substring(i + 1, j - 1)));
+					this.contents.add(new Selector(pending.toString(), body.substring(i + 1, j - 1)));
 					pending.setLength(0);
 					i = j;
 				} else if (c == ';') {
-					addProperty(props, pending.toString());
+					addStatementOrProperty(pending.toString());
 					pending.setLength(0);
 					i++;
 				} else {
@@ -360,10 +540,8 @@ public class CSSMinifier extends AbstractMinifier {
 					i++;
 				}
 			}
-			// A trailing declaration with no terminating semicolon.
-			addProperty(props, pending.toString());
-			this.properties = props.toArray(new Property[0]);
-			sortProperties(this.properties);
+			// A trailing declaration or statement with no terminating semicolon.
+			addStatementOrProperty(pending.toString());
 		}
 
 		/**
@@ -589,6 +767,70 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 
 		/**
+		 * Returns the index in {@code header}, the text in front of a rule's opening
+		 * brace, at which the rule's own prelude starts, after any statements and
+		 * retained comments in front of it. Strings, {@code url()} tokens and comments
+		 * are skipped, so that a ";" inside one isn't taken for the end of a statement.
+		 *
+		 * @param header the text in front of a rule's opening brace
+		 * @return the index at which the rule's prelude starts
+		 */
+		private static int preludeStart(String header) {
+			// The prelude starts after the last statement...
+			int start = 0;
+			int i = 0;
+			while (i < header.length()) {
+				char c = header.charAt(i);
+				if (c == '"' || c == '\'') {
+					i = consumeString(header, i, null);
+				} else if (isUrlStart(header, i)) {
+					i = consumeUrl(header, i, null);
+				} else if (header.startsWith("/*", i)) {
+					i = consumeComment(header, i, null);
+				} else {
+					i++;
+					if (c == ';') {
+						start = i;
+					}
+				}
+			}
+			// ...and after any whitespace and comments in front of it.
+			i = start;
+			while (i < header.length()) {
+				if (header.startsWith("/*", i)) {
+					i = consumeComment(header, i, null);
+				} else if (Character.isWhitespace(header.charAt(i))) {
+					i++;
+				} else {
+					break;
+				}
+			}
+			return i;
+		}
+
+		/**
+		 * Returns {@code true} if {@code header}, the text in front of a rule's
+		 * opening brace, is the prelude of an {@code @layer} block, after any
+		 * statements and retained comments in front of it.
+		 *
+		 * @param header the text in front of a rule's opening brace
+		 * @return whether the rule is an {@code @layer} block
+		 */
+		private static boolean isLayerBlock(String header) {
+			int i = preludeStart(header);
+			if (!header.regionMatches(true, i, "@layer", 0, 6)) {
+				return false;
+			}
+			// "@layer" must be the whole at-keyword, not the start of a longer one.
+			i += 6;
+			if (i < header.length()) {
+				char next = header.charAt(i);
+				return !(Character.isLetterOrDigit(next) || next == '-' || next == '_');
+			}
+			return true;
+		}
+
+		/**
 		 * Applies {@code f} to each run of {@code s} outside strings, {@code url()}
 		 * tokens and comments, copying those unchanged so that a simplification can't
 		 * alter their contents.
@@ -626,64 +868,66 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 
 		/**
-		 * Parses {@code declaration} as a {@link Property} and adds it to
-		 * {@code props}. Blank declarations are ignored, and incomplete ones are
+		 * Adds {@code text}, from a rule's body, to this Selector's contents: as a
+		 * statement if it's an at-rule statement, such as "@layer a, b", or else as a
+		 * declaration.
+		 *
+		 * @param text a single statement or declaration, without its ";"
+		 */
+		private void addStatementOrProperty(String text) {
+			int start = preludeStart(text);
+			if (start < text.length() && text.charAt(start) == '@') {
+				this.contents.add(minifySelector(text + ";"));
+			} else {
+				addProperty(text);
+			}
+		}
+
+		/**
+		 * Parses {@code declaration} as a {@link Property} and adds it to this
+		 * Selector's contents. Blank declarations are ignored, and incomplete ones are
 		 * logged and skipped.
 		 *
-		 * @param props       list to add the parsed property to
 		 * @param declaration a single "name: value" declaration
 		 */
-		private void addProperty(List<Property> props, String declaration) {
+		private void addProperty(String declaration) {
 			if (declaration.trim().isEmpty()) {
 				return;
 			}
 			try {
-				props.add(new Property(declaration));
+				this.contents.add(new Property(declaration));
 			} catch (IncompletePropertyException ipex) {
 				LOG.debug("Incomplete property in selector '{}': {}", selector, ipex.getMessage());
 			}
 		}
 
 		/**
-		 * Prints out this selector and its contents nicely, with the contents sorted
-		 * alphabetically.
+		 * Prints out this selector and its contents, in their original order. (A later
+		 * declaration wins over an earlier one, so reordering them could change which
+		 * value applies.)
 		 *
 		 * @returns A string representing this selector, minified.
 		 */
 		public String toString() {
 			StringBuffer sb = new StringBuffer();
 			sb.append(this.selector).append("{");
-			if (this.subSelectors != null) {
-				for (Selector s : this.subSelectors) {
-					sb.append(s.toString());
-				}
+			for (Object item : this.contents) {
+				sb.append(item);
 			}
-			if (this.properties != null) {
-				for (Property p : this.properties) {
-					sb.append(p.toString());
-				}
-			}
-			if (sb.charAt(sb.length() - 1) == ';') {
+			// The last declaration doesn't need its ";". (A statement keeps its own,
+			// since ending one with the "}" is a parse error.)
+			if (!this.contents.isEmpty() && this.contents.get(this.contents.size() - 1) instanceof Property) {
 				sb.deleteCharAt(sb.length() - 1);
 			}
 			sb.append("}");
 			return sb.toString();
-		}
-
-		/**
-		 * Sorts the properties array to enhance gzipping.
-		 *
-		 * @param properties The array to be sorted.
-		 */
-		private void sortProperties(Property[] properties) {
-			Arrays.sort(properties);
 		}
 	}
 
 	/**
 	 * Represents a CSS property.
 	 */
-	private static class Property implements Comparable<Property> {
+	private static class Property {
 		protected String property;
 		protected Part[] parts;
 		// Any retained comments in front of the declaration, copied through unchanged
@@ -762,32 +1006,6 @@ public class CSSMinifier extends AbstractMinifier {
 			sb.deleteCharAt(sb.length() - 1); // Delete the trailing comma.
 			sb.append(";");
 			return sb.toString();
-		}
-
-		/**
-		 * Compare this property with another.
-		 */
-		public int compareTo(Property other) {
-			// We can't just use String.compareTo(), because we need to sort properties that
-			// have hack prefixes last -- eg, *display should come after display.
-			String thisProp = this.property;
-			String thatProp = other.property;
-
-			if (thisProp.charAt(0) == '-') {
-				thisProp = thisProp.substring(1);
-				thisProp = thisProp.substring(thisProp.indexOf('-') + 1);
-			} else if (thisProp.charAt(0) < 65) {
-				thisProp = thisProp.substring(1);
-			}
-
-			if (thatProp.charAt(0) == '-') {
-				thatProp = thatProp.substring(1);
-				thatProp = thatProp.substring(thatProp.indexOf('-') + 1);
-			} else if (thatProp.charAt(0) < 65) {
-				thatProp = thatProp.substring(1);
-			}
-
-			return thisProp.compareTo(thatProp);
 		}
 
 		/**

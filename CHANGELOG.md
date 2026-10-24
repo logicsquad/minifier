@@ -3,6 +3,28 @@
 The format here is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6] - 2026-10-24
+### Changed
+- Updated `central-publishing-maven-plugin` to 0.12.0, since Maven
+  Central rejects the bundles that 0.11.0 builds with Maven 3.10.
+
+### Fixed
+- Fixed dropping of empty `@layer` blocks, which still set the layer
+  order. #30
+- Fixed dropping of statements, such as `@import` and `@layer`, and
+  kept comments in front of an empty rule. #31
+- Fixed dropping of at-rule statements inside a block, such as
+  `@layer` statements, which set the layer order. #35
+- Fixed minification making a misplaced `@import` or `@namespace` rule
+  valid, by dropping an empty rule in front of it. #36
+- Fixed reordering of declarations, which could change which value
+  wins: they are no longer sorted by property name, or moved after
+  nested rules. #37
+- Fixed minification making an ignored `@charset` rule valid, which
+  could change how browsers decode the stylesheet. #38
+- Fixed the tokens on either side of a removed comment running
+  together, as in `0/**/auto`, which became `0auto`. #39
+
 ## [1.5] - 2026-09-24
 ### Changed
 - Values are no longer lowercased (except six-digit hex colours),

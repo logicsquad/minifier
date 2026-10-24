@@ -1,0 +1,1 @@
+@import url("theme.css");/** Kept, although the rule after it is empty. */@layer base,theme;@layer theme{a{color:red}}@layer base{a{color:blue}}@layer overrides;

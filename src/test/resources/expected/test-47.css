@@ -1,1 +1,1 @@
-.k{--anim:FadeIn;container-name:Sidebar;counter-reset:MyCounter;grid-area:Main;width:calc(var(--Gap)*2)}
+.k{--anim:FadeIn;width:calc(var(--Gap)*2);counter-reset:MyCounter;grid-area:Main;container-name:Sidebar}
