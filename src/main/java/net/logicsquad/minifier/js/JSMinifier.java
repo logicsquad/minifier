@@ -286,12 +286,29 @@ public class JSMinifier extends AbstractMinifier {
 				out.write(theB);
 				for (;;) {
 					theA = read();
-					if (theA == '/') {
+					if (theA == '[') {
+						// A "/" in a character class doesn't end the literal.
+						for (;;) {
+							out.write(theA);
+							theA = read();
+							if (theA == ']') {
+								break;
+							}
+							if (theA == '\\') {
+								out.write(theA);
+								theA = read();
+							}
+							if (theA == '\n' || theA == EOF) {
+								throw new UnterminatedRegExpLiteralException();
+							}
+						}
+					} else if (theA == '/') {
 						break;
 					} else if (theA == '\\') {
 						out.write(theA);
 						theA = read();
-					} else if (theA == '\n' || theA == EOF) {
+					}
+					if (theA == '\n' || theA == EOF) {
 						throw new UnterminatedRegExpLiteralException();
 					}
 					out.write(theA);

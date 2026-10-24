@@ -55,6 +55,12 @@ public class JSMinifierTest extends AbstractMinifierTest {
 	}
 
 	@Test
+	public void unterminatedRegExpLiteralClassThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-regexp-class.js", JSMinifier.UnterminatedRegExpLiteralException.class);
+		return;
+	}
+
+	@Test
 	public void unterminatedTemplateLiteralThrowsException() throws IOException {
 		throwsOnMinify("exceptions/unterminated-template.js", JSMinifier.UnterminatedStringLiteralException.class);
 		return;
