@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.Reader;
 import java.io.Writer;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 import net.logicsquad.minifier.AbstractMinifier;
 import net.logicsquad.minifier.MinificationException;
@@ -47,6 +49,18 @@ public class JSMinifier extends AbstractMinifier {
 	 * whether whitespace came between A and B
 	 */
 	private int theY = EOF;
+
+	/**
+	 * Number of "{"s read in code, less the number of "}"s, not counting those that
+	 * start and end template literal substitutions
+	 */
+	private int depth;
+
+	/**
+	 * For each template literal substitution open at this point, innermost first,
+	 * the value of {@link #depth} where it starts
+	 */
+	private final Deque<Integer> substitutions = new ArrayDeque<>();
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
@@ -200,9 +214,9 @@ public class JSMinifier extends AbstractMinifier {
 	 * </dl>
 	 *
 	 * <p>
-	 * String and regular expressions are treated as "single characters", in that
-	 * they are pushed through the pipeline in their entirety by a single call to
-	 * this method.
+	 * Strings, regular expressions and the text of template literals are treated
+	 * as "single characters", in that they are pushed through the pipeline in
+	 * their entirety by a single call to this method.
 	 * <p>
 	 *
 	 * @param action type of action
@@ -230,7 +244,7 @@ public class JSMinifier extends AbstractMinifier {
 			}
 		case COPY_GET:
 			theA = theB;
-			if (theA == '\'' || theA == '`' || theA == '"') {
+			if (theA == '\'' || theA == '"') {
 				for (;;) {
 					out.write(theA);
 					theA = read();
@@ -245,6 +259,15 @@ public class JSMinifier extends AbstractMinifier {
 						theA = read();
 					}
 				}
+			} else if (theA == '`' || theA == '}' && !substitutions.isEmpty() && substitutions.peek() == depth) {
+				if (theA == '}') {
+					substitutions.pop();
+				}
+				copyTemplate(out);
+			} else if (theA == '{') {
+				depth++;
+			} else if (theA == '}') {
+				depth--;
 			}
 		case GET:
 			theB = next();
@@ -270,6 +293,42 @@ public class JSMinifier extends AbstractMinifier {
 			break;
 		default:
 			throw new IllegalStateException("Unknown action: " + action);
+		}
+	}
+
+	/**
+	 * Copies the text of a template literal to {@code out}, from {@link #theA},
+	 * the backtick that opens it or the "}" that ends a substitution in it, up to
+	 * the backtick that closes it or the "${" that starts a substitution. That
+	 * backtick or "{" is left in {@link #theA}, and the code in a substitution is
+	 * minified as any other code is.
+	 *
+	 * @param out {@link Writer} for minified output
+	 * @throws IOException                        if thrown by {@link Reader} or
+	 *                                            {@link Writer}
+	 * @throws UnterminatedStringLiteralException if the template literal is
+	 *                                            unterminated
+	 */
+	private void copyTemplate(Writer out) throws IOException, UnterminatedStringLiteralException {
+		for (;;) {
+			out.write(theA);
+			theA = read();
+			if (theA == '`') {
+				return;
+			}
+			if (theA == '$' && peek() == '{') {
+				out.write(theA);
+				theA = read();
+				substitutions.push(depth);
+				return;
+			}
+			if (theA == '\\') {
+				out.write(theA);
+				theA = read();
+			}
+			if (theA == EOF) {
+				throw new UnterminatedStringLiteralException();
+			}
 		}
 	}
 
@@ -356,6 +415,10 @@ public class JSMinifier extends AbstractMinifier {
 						break;
 					}
 				}
+			}
+			if (!substitutions.isEmpty()) {
+				// The input ends in a template literal substitution.
+				throw new UnterminatedStringLiteralException();
 			}
 		} catch (IOException | UnterminatedCommentException | UnterminatedRegExpLiteralException
 				| UnterminatedStringLiteralException e) {

@@ -54,6 +54,18 @@ public class JSMinifierTest extends AbstractMinifierTest {
 		return;
 	}
 
+	@Test
+	public void unterminatedTemplateLiteralThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-template.js", JSMinifier.UnterminatedStringLiteralException.class);
+		return;
+	}
+
+	@Test
+	public void unterminatedSubstitutionThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-substitution.js", JSMinifier.UnterminatedStringLiteralException.class);
+		return;
+	}
+
 	/**
 	 * Tests that a line continuation in a string works with each kind of line
 	 * break: "\r\n" is one line break, not two.
