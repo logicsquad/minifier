@@ -191,7 +191,7 @@ public class CSSMinifier implements Minifier {
 		// anything still pending from a rule that was skipped.
 		output.append(Selector.minifySelector(pending + css.substring(n)));
 		LOG.debug("Process completed successfully.");
-		return withoutIgnoredCharset(output.toString(), input) + "\r\n";
+		return withoutIgnoredCharset(output.toString(), input);
 	}
 
 	/**

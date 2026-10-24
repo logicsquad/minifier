@@ -67,6 +67,18 @@ public class JSMinifierTest extends AbstractMinifierTest {
 	 */
 	@Test
 	public void trailingSlashGainsNothing() throws MinificationException {
-		assertEquals("a=b/", new JSMinifier().minify("a = b /").trim());
+		assertEquals("a=b/", new JSMinifier().minify("a = b /"));
+	}
+
+	/**
+	 * Tests that the output has no line break at either end: JSMin outputs one in
+	 * front of the first token.
+	 *
+	 * @throws MinificationException if minification fails
+	 */
+	@Test
+	public void noLineBreakAtEitherEnd() throws MinificationException {
+		assertEquals("var a=1;", new JSMinifier().minify("var a = 1;\n"));
+		assertEquals("a\nb", new JSMinifier().minify("\n\na\nb\n\n"));
 	}
 }

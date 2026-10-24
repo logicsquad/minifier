@@ -111,9 +111,24 @@ public abstract class AbstractMinifierTest {
 	Stream<DynamicTest> minifiesEachResource() throws IOException {
 		Minifier minifier = minifier();
 		return indexes().stream().map(index -> DynamicTest.dynamicTest("test-" + index + "." + extension(), () -> {
-			// trim() here because there seems to be a difference in line endings
-			assertEquals(stringForExpectedFile(index).trim(), minifier.minify(stringForSourceFile(index)).trim());
+			assertEquals(withoutFinalLineBreak(stringForExpectedFile(index)),
+					minifier.minify(stringForSourceFile(index)));
 		}));
+	}
+
+	/**
+	 * Returns {@code s} without the line break it ends with, if it ends with one.
+	 * An expected output file can end with a line break that isn't part of the
+	 * output.
+	 *
+	 * @param s a string
+	 * @return {@code s}, without the line break it ends with
+	 */
+	private static String withoutFinalLineBreak(String s) {
+		if (s.endsWith("\r\n")) {
+			return s.substring(0, s.length() - 2);
+		}
+		return s.endsWith("\n") || s.endsWith("\r") ? s.substring(0, s.length() - 1) : s;
 	}
 
 	/**

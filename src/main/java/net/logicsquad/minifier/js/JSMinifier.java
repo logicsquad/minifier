@@ -364,7 +364,17 @@ public class JSMinifier implements Minifier {
 					}
 				}
 			}
-			return out.toString();
+			// JSMin starts with a line break as its "previous character", and outputs it
+			// in front of the first token. A line break at either end does nothing.
+			int start = 0;
+			int end = out.length();
+			while (start < end && out.charAt(start) == '\n') {
+				start++;
+			}
+			while (end > start && out.charAt(end - 1) == '\n') {
+				end--;
+			}
+			return out.substring(start, end);
 		}
 	}
 }
