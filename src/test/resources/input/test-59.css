@@ -1,0 +1,5 @@
+.before {}
+@media print {}
+@import url("theme.css");
+.after {}
+b { color: red }

@@ -141,6 +141,11 @@ public class CSSMinifier extends AbstractMinifier {
 			// When a rule is skipped, the statements and retained comments in front of it
 			// are kept, and output in front of whatever comes next.
 			String pending = "";
+			// An @import or @namespace statement that comes after a rule is invalid, so an
+			// empty rule in front of one is kept: dropping it could make the statement
+			// valid. This finds the last mention of either, even in a string or comment,
+			// which at worst keeps an empty rule that could have been dropped.
+			int lastImport = lastImportOrNamespace(css);
 			// Scan for top-level rules, skipping strings, url() tokens and (retained)
 			// comments so that braces inside them are not mistaken for rule boundaries.
 			n = 0;
@@ -164,7 +169,7 @@ public class CSSMinifier extends AbstractMinifier {
 						throw new UnbalancedBracesException();
 					}
 					if (j == 0) {
-						pending = addSelector(selectors, pending + css.substring(n, i));
+						pending = addSelector(selectors, pending + css.substring(n, i), i <= lastImport);
 						n = i;
 					}
 				} else {
@@ -178,7 +183,7 @@ public class CSSMinifier extends AbstractMinifier {
 				for (; j > 0; j--) {
 					rule.append('}');
 				}
-				pending = addSelector(selectors, rule.toString());
+				pending = addSelector(selectors, rule.toString(), false); // nothing comes after it
 				n = css.length();
 			}
 
@@ -205,20 +210,23 @@ public class CSSMinifier extends AbstractMinifier {
 
 	/**
 	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
-	 * rule that is unterminated, or has an empty body and isn't an {@code @layer}
-	 * block, is logged and skipped, but not the statements and retained comments in
-	 * front of it: they're returned, to be output in front of whatever comes next.
+	 * rule that is unterminated is logged and skipped, as is one with an empty body,
+	 * unless it's an {@code @layer} block or {@code keepEmpty} is set. The statements
+	 * and retained comments in front of a skipped rule aren't skipped, though:
+	 * they're returned, to be output in front of whatever comes next.
 	 *
 	 * @param selectors list to add the parsed rule to
 	 * @param rule      a whole rule, from any statements and retained comments in
 	 *                  front of it to its closing brace
+	 * @param keepEmpty whether to keep {@code rule} even if its body is empty
 	 * @return the statements and retained comments in front of {@code rule} if it
 	 *         was skipped, or an empty string if it was added
 	 * @throws IncompleteSelectorException if {@code rule} has no opening brace
 	 */
-	private static String addSelector(List<Selector> selectors, String rule) throws IncompleteSelectorException {
+	private static String addSelector(List<Selector> selectors, String rule, boolean keepEmpty)
+			throws IncompleteSelectorException {
 		try {
-			selectors.add(new Selector(rule));
+			selectors.add(new Selector(rule, keepEmpty));
 			return "";
 		} catch (UnterminatedSelectorException usex) {
 			LOG.debug("Unterminated selector: {}", usex.getMessage());
@@ -227,6 +235,22 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 		String header = rule.substring(0, Selector.openingBrace(rule));
 		return header.substring(0, Selector.preludeStart(header));
+	}
+
+	/**
+	 * Returns the index of the last "@import" or "@namespace" in {@code css},
+	 * ignoring case, or -1 if there is neither.
+	 *
+	 * @param css the CSS to search
+	 * @return the index of the last "@import" or "@namespace", or -1
+	 */
+	private static int lastImportOrNamespace(String css) {
+		for (int i = css.lastIndexOf('@'); i >= 0; i = css.lastIndexOf('@', i - 1)) {
+			if (css.regionMatches(true, i, "@import", 0, 7) || css.regionMatches(true, i, "@namespace", 0, 10)) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	/**
@@ -288,11 +312,12 @@ public class CSSMinifier extends AbstractMinifier {
 		/**
 		 * Creates a new Selector using the supplied strings.
 		 *
-		 * @param selector The selector; for example, "div { border: solid 1px red;
-		 *                 color: blue; }"
+		 * @param selector  The selector; for example, "div { border: solid 1px red;
+		 *                  color: blue; }"
+		 * @param keepEmpty whether to keep the selector even if its body is empty
 		 * @throws Exception If the selector is incomplete and cannot be parsed.
 		 */
-		public Selector(String selector)
+		public Selector(String selector, boolean keepEmpty)
 				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
 			int brace = openingBrace(selector);
 			if (brace < 0) {
@@ -303,9 +328,10 @@ public class CSSMinifier extends AbstractMinifier {
 			if (body.isEmpty() || body.charAt(body.length() - 1) != '}') {
 				throw new UnterminatedSelectorException(selector);
 			}
-			// An empty @layer block is the exception: it still declares its layer, which
-			// fixes where the layer comes in the layer order.
-			if (body.length() == 1 && !isLayerBlock(selector.substring(0, brace))) {
+			// The caller can ask for an empty rule to be kept, and an empty @layer block
+			// always is: it still declares its layer, which fixes where the layer comes in
+			// the layer order.
+			if (body.length() == 1 && !keepEmpty && !isLayerBlock(selector.substring(0, brace))) {
 				throw new EmptySelectorBodyException(selector);
 			}
 			LOG.debug("Parsing selector: {}", selector.substring(0, brace).trim());
