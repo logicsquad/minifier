@@ -120,92 +120,86 @@ public class CSSMinifier implements Minifier {
 	 */
 	@Override
 	public String minify(String source) throws MinificationException {
-		try {
-			int j, // Number of open braces
-					n; // Current position in stream
-			char curr;
+		int j, // Number of open braces
+				n; // Current position in stream
+		char curr;
 
-			// A line break is whitespace, which can separate tokens, so line breaks are
-			// kept, as "\n". One at the very end isn't needed, and would end up inside a
-			// string or url() left open at the end.
-			String input = source.replace("\r\n", "\n").replace('\r', '\n');
-			if (input.endsWith("\n")) {
-				input = input.substring(0, input.length() - 1);
-			}
-			LOG.debug("Removing comments...");
-			String css = removeComments(input);
-			LOG.debug("Parsing and processing selectors...");
-			List<Selector> selectors = new ArrayList<>();
-			// When a rule is skipped, the statements and retained comments in front of it
-			// are kept, and output in front of whatever comes next.
-			String pending = "";
-			// An @import or @namespace statement that comes after a rule is invalid, so an
-			// empty rule in front of one is kept: dropping it could make the statement
-			// valid. This finds the last mention of either, even in a string or comment,
-			// which at worst keeps an empty rule that could have been dropped.
-			int lastImport = lastImportOrNamespace(css);
-			// Scan for top-level rules, skipping strings, url() tokens and (retained)
-			// comments so that braces inside them are not mistaken for rule boundaries.
-			n = 0;
-			j = 0;
-			int i = 0;
-			while (i < css.length()) {
-				curr = css.charAt(i);
-				if (curr == '"' || curr == '\'') {
-					i = Selector.consumeString(css, i, null);
-				} else if (Selector.isUrlStart(css, i)) {
-					i = Selector.consumeUrl(css, i, null);
-				} else if (css.startsWith("/*", i)) {
-					i = Selector.consumeComment(css, i, null);
-				} else if (curr == '{') {
-					j++;
-					i++;
-				} else if (curr == '}') {
-					j--;
-					i++;
-					if (j < 0) {
-						throw new UnbalancedBracesException();
-					}
-					if (j == 0) {
-						pending = addSelector(selectors, pending + css.substring(n, i), i <= lastImport);
-						n = i;
-					}
-				} else {
-					i++;
-				}
-			}
-			if (j > 0) {
-				// The input ends inside a rule that was never closed. Browsers close any
-				// blocks still open at the end of a stylesheet, so do the same.
-				StringBuilder rule = new StringBuilder(pending + css.substring(n));
-				for (; j > 0; j--) {
-					rule.append('}');
-				}
-				pending = addSelector(selectors, rule.toString(), false); // nothing comes after it
-				n = css.length();
-			}
-
-			StringBuilder output = new StringBuilder();
-			for (Selector selector : selectors) {
-				output.append(selector);
-			}
-			// Anything after the last rule, such as a retained comment or an @layer
-			// statement, has no rule to be output with, so output it here, along with
-			// anything still pending from a rule that was skipped.
-			output.append(Selector.minifySelector(pending + css.substring(n)));
-			LOG.debug("Process completed successfully.");
-			return withoutIgnoredCharset(output.toString(), input) + "\r\n";
-		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException e) {
-			throw new MinificationException("Minification failed due to Exception.", e);
+		// A line break is whitespace, which can separate tokens, so line breaks are
+		// kept, as "\n". One at the very end isn't needed, and would end up inside a
+		// string or url() left open at the end.
+		String input = source.replace("\r\n", "\n").replace('\r', '\n');
+		if (input.endsWith("\n")) {
+			input = input.substring(0, input.length() - 1);
 		}
+		LOG.debug("Removing comments...");
+		String css = removeComments(input);
+		LOG.debug("Parsing and processing selectors...");
+		List<Selector> selectors = new ArrayList<>();
+		// When a rule is skipped, the statements and retained comments in front of it
+		// are kept, and output in front of whatever comes next.
+		String pending = "";
+		// An @import or @namespace statement that comes after a rule is invalid, so an
+		// empty rule in front of one is kept: dropping it could make the statement
+		// valid. This finds the last mention of either, even in a string or comment,
+		// which at worst keeps an empty rule that could have been dropped.
+		int lastImport = lastImportOrNamespace(css);
+		// Scan for top-level rules, skipping strings, url() tokens and (retained)
+		// comments so that braces inside them are not mistaken for rule boundaries.
+		// (removeComments() has checked that each "}" has a "{" to close.)
+		n = 0;
+		j = 0;
+		int i = 0;
+		while (i < css.length()) {
+			curr = css.charAt(i);
+			if (curr == '"' || curr == '\'') {
+				i = Selector.consumeString(css, i, null);
+			} else if (Selector.isUrlStart(css, i)) {
+				i = Selector.consumeUrl(css, i, null);
+			} else if (css.startsWith("/*", i)) {
+				i = Selector.consumeComment(css, i, null);
+			} else if (curr == '{') {
+				j++;
+				i++;
+			} else if (curr == '}') {
+				j--;
+				i++;
+				if (j == 0) {
+					pending = addSelector(selectors, pending + css.substring(n, i), i <= lastImport);
+					n = i;
+				}
+			} else {
+				i++;
+			}
+		}
+		if (j > 0) {
+			// The input ends inside a rule that was never closed. Browsers close any
+			// blocks still open at the end of a stylesheet, so do the same.
+			StringBuilder rule = new StringBuilder(pending + css.substring(n));
+			for (; j > 0; j--) {
+				rule.append('}');
+			}
+			pending = addSelector(selectors, rule.toString(), false); // nothing comes after it
+			n = css.length();
+		}
+
+		StringBuilder output = new StringBuilder();
+		for (Selector selector : selectors) {
+			output.append(selector);
+		}
+		// Anything after the last rule, such as a retained comment or an @layer
+		// statement, has no rule to be output with, so output it here, along with
+		// anything still pending from a rule that was skipped.
+		output.append(Selector.minifySelector(pending + css.substring(n)));
+		LOG.debug("Process completed successfully.");
+		return withoutIgnoredCharset(output.toString(), input) + "\r\n";
 	}
 
 	/**
 	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
-	 * rule that is unterminated is logged and skipped, as is one with an empty body,
-	 * unless it's an {@code @layer} block or {@code keepEmpty} is set. The statements
-	 * and retained comments in front of a skipped rule aren't skipped, though:
-	 * they're returned, to be output in front of whatever comes next.
+	 * rule with an empty body is logged and skipped, unless it's an {@code @layer}
+	 * block or {@code keepEmpty} is set. The statements and retained comments in
+	 * front of a skipped rule aren't skipped, though: they're returned, to be output
+	 * in front of whatever comes next.
 	 *
 	 * @param selectors list to add the parsed rule to
 	 * @param rule      a whole rule, from any statements and retained comments in
@@ -213,19 +207,21 @@ public class CSSMinifier implements Minifier {
 	 * @param keepEmpty whether to keep {@code rule} even if its body is empty
 	 * @return the statements and retained comments in front of {@code rule} if it
 	 *         was skipped, or an empty string if it was added
-	 * @throws IncompleteSelectorException if {@code rule} has no opening brace
 	 */
-	private static String addSelector(List<Selector> selectors, String rule, boolean keepEmpty)
-			throws IncompleteSelectorException {
-		try {
-			selectors.add(new Selector(rule, keepEmpty));
+	private static String addSelector(List<Selector> selectors, String rule, boolean keepEmpty) {
+		int brace = Selector.openingBrace(rule);
+		String header = rule.substring(0, brace);
+		// The body, without the closing brace that rule ends with
+		String body = rule.substring(brace + 1, rule.length() - 1).trim();
+		// The caller can ask for an empty rule to be kept, and an empty @layer block
+		// always is: it still declares its layer, which fixes where the layer comes in
+		// the layer order.
+		if (!body.isEmpty() || keepEmpty || Selector.isLayerBlock(header)) {
+			LOG.debug("Parsing selector: {}", header.trim());
+			selectors.add(new Selector(header, body));
 			return "";
-		} catch (UnterminatedSelectorException usex) {
-			LOG.debug("Unterminated selector: {}", usex.getMessage());
-		} catch (EmptySelectorBodyException ebex) {
-			LOG.debug("Empty selector body: {}", ebex.getMessage());
 		}
-		String header = rule.substring(0, Selector.openingBrace(rule));
+		LOG.debug("Empty selector body: {}", rule);
 		return header.substring(0, Selector.preludeStart(header));
 	}
 
@@ -278,15 +274,20 @@ public class CSSMinifier implements Minifier {
 	 * that keeps the tokens on either side of it apart, as it keeps "0" and "auto"
 	 * from running together into "0auto", it leaves a space in its place, or, in a
 	 * selector, where a space would be a descendant combinator, an empty comment.
+	 * Since positions in {@code css} are still those of the input, this is also
+	 * where each "}" is checked for a "{" to close.
 	 *
 	 * @param css the CSS to remove comments from
 	 * @return {@code css}, without any comments that aren't retained
-	 * @throws UnterminatedCommentException if a comment is unterminated
+	 * @throws MinificationException if a comment is unterminated, or a "}" has no
+	 *                               "{" to close
 	 */
-	private static String removeComments(String css) throws UnterminatedCommentException {
+	private static String removeComments(String css) throws MinificationException {
 		StringBuilder sb = new StringBuilder(css.length());
 		// Where in sb the current statement, declaration or rule prelude starts
 		int start = 0;
+		// Number of open braces
+		int depth = 0;
 		int i = 0;
 		while (i < css.length()) {
 			char c = css.charAt(i);
@@ -297,7 +298,7 @@ public class CSSMinifier implements Minifier {
 			} else if (css.startsWith("/*", i)) {
 				int end = css.indexOf("*/", i + 2);
 				if (end == -1) {
-					throw new UnterminatedCommentException();
+					throw new MinificationException("Unterminated comment", css, i);
 				}
 				// Here we retain "Javadoc-style" comments. We're looking for "/**", but need to exclude "/**/".
 				// https://github.com/logicsquad/minifier/issues/4
@@ -312,6 +313,11 @@ public class CSSMinifier implements Minifier {
 				sb.append(' ');
 				i++;
 			} else {
+				if (c == '{') {
+					depth++;
+				} else if (c == '}' && --depth < 0) {
+					throw new MinificationException("Unmatched \"}\"", css, i);
+				}
 				sb.append(c);
 				i++;
 				if (c == '{' || c == '}' || c == ';') {
@@ -432,46 +438,12 @@ public class CSSMinifier implements Minifier {
 		private String selector;
 
 		/**
-		 * Creates a new Selector using the supplied strings.
-		 *
-		 * @param selector  The selector; for example, "div { border: solid 1px red;
-		 *                  color: blue; }"
-		 * @param keepEmpty whether to keep the selector even if its body is empty
-		 * @throws Exception If the selector is incomplete and cannot be parsed.
-		 */
-		public Selector(String selector, boolean keepEmpty)
-				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
-			int brace = openingBrace(selector);
-			if (brace < 0) {
-				throw new IncompleteSelectorException(selector);
-			}
-			String body = selector.substring(brace + 1).trim();
-			// The body must be brace-terminated, and must contain more than just "}".
-			if (body.isEmpty() || body.charAt(body.length() - 1) != '}') {
-				throw new UnterminatedSelectorException(selector);
-			}
-			// The caller can ask for an empty rule to be kept, and an empty @layer block
-			// always is: it still declares its layer, which fixes where the layer comes in
-			// the layer order.
-			if (body.length() == 1 && !keepEmpty && !isLayerBlock(selector.substring(0, brace))) {
-				throw new EmptySelectorBodyException(selector);
-			}
-			LOG.debug("Parsing selector: {}", selector.substring(0, brace).trim());
-			init(selector.substring(0, brace), body.substring(0, body.length() - 1));
-		}
-
-		/**
-		 * Creates a new Selector from a pre-split header and body. Used when recursing
-		 * into nested rules, where the surrounding braces have already been stripped.
+		 * Creates a new Selector from its header and body.
 		 *
 		 * @param header the selector text, for example "div" or "@media screen"
 		 * @param body   the selector body, without its enclosing braces
-		 * @throws IncompleteSelectorException  if a nested selector cannot be parsed
-		 * @throws UnterminatedSelectorException if a nested selector is unterminated
-		 * @throws EmptySelectorBodyException   if a nested selector has an empty body
 		 */
-		private Selector(String header, String body)
-				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
+		Selector(String header, String body) {
 			init(header, body);
 		}
 
@@ -483,8 +455,7 @@ public class CSSMinifier implements Minifier {
 		 * @param header the raw selector text
 		 * @param body   the selector body, without its enclosing braces
 		 */
-		private void init(String header, String body)
-				throws IncompleteSelectorException, UnterminatedSelectorException, EmptySelectorBodyException {
+		private void init(String header, String body) {
 			this.selector = minifySelector(header);
 			body = body.trim();
 			// Drop a single trailing semicolon so the final declaration parses cleanly.
@@ -877,10 +848,11 @@ public class CSSMinifier implements Minifier {
 			if (declaration.trim().isEmpty()) {
 				return;
 			}
-			try {
-				this.contents.add(new Property(declaration));
-			} catch (IncompletePropertyException ipex) {
-				LOG.debug("Incomplete property in selector '{}': {}", selector, ipex.getMessage());
+			Property property = Property.parse(declaration);
+			if (property == null) {
+				LOG.debug("Incomplete property in selector '{}': {}", selector, declaration);
+			} else {
+				this.contents.add(property);
 			}
 		}
 
@@ -917,17 +889,17 @@ public class CSSMinifier implements Minifier {
 		protected String comments;
 
 		/**
-		 * Creates a new Property using the supplied strings. Parses out the values of
-		 * the property selector.
+		 * Parses {@code declaration} as a Property.
 		 *
-		 * @param property The property; for example, "border: solid 1px red;" or
-		 *                 "-moz-box-shadow: 3px 3px 3px rgba(255, 255, 0, 0.5);".
-		 * @throws Exception If the property is incomplete and cannot be parsed.
+		 * @param declaration The declaration; for example, "border: solid 1px red;" or
+		 *                    "-moz-box-shadow: 3px 3px 3px rgba(255, 255, 0, 0.5);".
+		 * @return the declaration as a Property, or {@code null} if it's incomplete:
+		 *         if it has no name or no value
 		 */
-		public Property(String property) throws IncompletePropertyException {
+		static Property parse(String declaration) {
 			// Retained comments in front of the declaration are kept in front of it,
 			// unchanged, rather than being parsed as part of the property name.
-			property = property.trim();
+			String property = declaration.trim();
 			int start = 0;
 			while (property.startsWith("/*", start)) {
 				start = Selector.consumeComment(property, start, null);
@@ -935,7 +907,7 @@ public class CSSMinifier implements Minifier {
 					start++;
 				}
 			}
-			this.comments = property.substring(0, start).trim();
+			String comments = property.substring(0, start).trim();
 			property = property.substring(start);
 
 			ArrayList<String> parts = new ArrayList<String>();
@@ -961,16 +933,28 @@ public class CSSMinifier implements Minifier {
 				parts.add(substr);
 			}
 			if (parts.size() < 2) {
-				throw new IncompletePropertyException(property);
+				return null;
 			}
+			return new Property(comments, parts.get(0), parts.get(1));
+		}
 
-			String prop = parts.get(0).trim();
+		/**
+		 * Creates a new Property from its name and value. Parses out the parts of the
+		 * value.
+		 *
+		 * @param comments any retained comments in front of the declaration
+		 * @param name     the property's name
+		 * @param value    the property's value
+		 */
+		private Property(String comments, String name, String value) {
+			this.comments = comments;
+			String prop = name.trim();
 			if (!(prop.length() > 2 && prop.substring(0, 2).equals("--"))) {
 				prop = prop.toLowerCase();
 			}
 			this.property = prop;
-			this.parts = parseValues(Selector.outsideStringsAndUrls(parts.get(1).trim(),
-					value -> simplifyColours(value.replaceAll("\\s+", " ").replaceAll(", ", ","))));
+			this.parts = parseValues(Selector.outsideStringsAndUrls(value.trim(),
+					s -> simplifyColours(s.replaceAll("\\s+", " ").replaceAll(", ", ","))));
 		}
 
 		/**
@@ -1290,102 +1274,6 @@ public class CSSMinifier implements Minifier {
 		 */
 		public String toString() {
 			return this.contents;
-		}
-	}
-
-	/**
-	 * Exception representing an unterminated comment.
-	 */
-	static class UnterminatedCommentException extends Exception {
-		/**
-		 * Serial version UID
-		 */
-		private static final long serialVersionUID = 1L;
-	}
-
-	/**
-	 * Exception representing unbalanced braces.
-	 */
-	private static class UnbalancedBracesException extends Exception {
-		/**
-		 * Serial version UID
-		 */
-		private static final long serialVersionUID = 1L;
-	}
-
-	/**
-	 * Exception representing an incomplete property.
-	 */
-	private static class IncompletePropertyException extends Exception {
-		/**
-		 * Serial version UID
-		 */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * Constructor taking a message
-		 *
-		 * @param message a message
-		 */
-		public IncompletePropertyException(String message) {
-			super(message);
-		}
-	}
-
-	/**
-	 * Exception representing an empty selector body.
-	 */
-	private static class EmptySelectorBodyException extends Exception {
-		/**
-		 * Serial version UID
-		 */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * Constructor taking a message
-		 *
-		 * @param message a message
-		 */
-		public EmptySelectorBodyException(String message) {
-			super(message);
-		}
-	}
-
-	/**
-	 * Exception representing an unterminated selector.
-	 */
-	private static class UnterminatedSelectorException extends Exception {
-		/**
-		 * Serial version UID
-		 */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * Constructor taking a message
-		 *
-		 * @param message a message
-		 */
-		public UnterminatedSelectorException(String message) {
-			super(message);
-		}
-	}
-
-	/**
-	 * Exception representing an incomplete selector.
-	 */
-	private static class IncompleteSelectorException extends Exception {
-		/**
-		 * Serial version UID
-		 */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * Constructor taking a message
-		 *
-		 * @param message a message
-		 */
-		public IncompleteSelectorException(String message) {
-			super(message);
 		}
 	}
 }

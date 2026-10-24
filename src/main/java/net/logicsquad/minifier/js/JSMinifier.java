@@ -54,12 +54,7 @@ public class JSMinifier implements Minifier {
 	 */
 	@Override
 	public String minify(String source) throws MinificationException {
-		try {
-			return new Minification(source).minify();
-		} catch (UnterminatedCommentException | UnterminatedRegExpLiteralException
-				| UnterminatedStringLiteralException e) {
-			throw new MinificationException("Minification failed due to Exception.", e);
-		}
+		return new Minification(source).minify();
 	}
 
 	/**
@@ -108,6 +103,12 @@ public class JSMinifier implements Minifier {
 		 * Second character in two-character "cursor" over source
 		 */
 		private int theB;
+
+		/**
+		 * Index in {@link #in} of {@link #theB}, for reporting where a string or
+		 * regular expression literal starts
+		 */
+		private int bIndex;
 
 		/**
 		 * Minified output
@@ -167,11 +168,12 @@ public class JSMinifier implements Minifier {
 		 * Returns the next character from {@link #in}, <em>excluding comments</em>.
 		 *
 		 * @return next character (excluding comments)
-		 * @throws UnterminatedCommentException if comment was unterminated
+		 * @throws MinificationException if comment was unterminated
 		 */
-		int next() throws UnterminatedCommentException {
+		int next() throws MinificationException {
 			int c = get();
 			if (c == '/') {
+				int start = pos - 1;
 				switch (peek()) {
 				case '/':
 					for (;;) {
@@ -191,7 +193,7 @@ public class JSMinifier implements Minifier {
 							}
 							break;
 						case EOF:
-							throw new UnterminatedCommentException();
+							throw new MinificationException("Unterminated comment", in, start);
 						}
 					}
 				default:
@@ -231,22 +233,18 @@ public class JSMinifier implements Minifier {
 		 * <p>
 		 *
 		 * @param action type of action
-		 * @throws UnterminatedRegExpLiteralException if this method encounters an
-		 *                                            unterminated regular expression
-		 *                                            literal
-		 * @throws UnterminatedCommentException       if this method encounters an
-		 *                                            unterminated comment
-		 * @throws UnterminatedStringLiteralException if this method encounters an
-		 *                                            unterminated string literal
+		 * @throws MinificationException if this method encounters an unterminated
+		 *                               comment, string literal or regular
+		 *                               expression literal
 		 */
-		void action(Action action) throws UnterminatedRegExpLiteralException, UnterminatedCommentException,
-				UnterminatedStringLiteralException {
+		void action(Action action) throws MinificationException {
 			switch (action) {
 			case OUTPUT_COPY_GET:
 				write(theA);
 			case COPY_GET:
 				theA = theB;
 				if (theA == '\'' || theA == '`' || theA == '"') {
+					int start = bIndex;
 					for (;;) {
 						write(theA);
 						theA = get();
@@ -254,7 +252,7 @@ public class JSMinifier implements Minifier {
 							break;
 						}
 						if (theA <= '\n') {
-							throw new UnterminatedStringLiteralException();
+							throw new MinificationException("Unterminated string literal", in, start);
 						}
 						if (theA == '\\') {
 							write(theA);
@@ -264,9 +262,11 @@ public class JSMinifier implements Minifier {
 				}
 			case GET:
 				theB = next();
+				bIndex = pos - 1;
 				if (theB == '/' && (theA == '(' || theA == ',' || theA == '=' || theA == ':' || theA == '['
 						|| theA == '!' || theA == '&' || theA == '|' || theA == '?' || theA == '{' || theA == '}'
 						|| theA == ';' || theA == '\n')) {
+					int start = bIndex;
 					write(theA);
 					write(theB);
 					for (;;) {
@@ -277,11 +277,12 @@ public class JSMinifier implements Minifier {
 							write(theA);
 							theA = get();
 						} else if (theA <= '\n') {
-							throw new UnterminatedRegExpLiteralException();
+							throw new MinificationException("Unterminated regular expression literal", in, start);
 						}
 						write(theA);
 					}
 					theB = next();
+					bIndex = pos - 1;
 				}
 				break;
 			default:
@@ -294,16 +295,10 @@ public class JSMinifier implements Minifier {
 		 * Javascript.
 		 *
 		 * @return {@link #in}, minified
-		 * @throws UnterminatedRegExpLiteralException if {@link #in} has an
-		 *                                            unterminated regular expression
-		 *                                            literal
-		 * @throws UnterminatedCommentException       if {@link #in} has an
-		 *                                            unterminated comment
-		 * @throws UnterminatedStringLiteralException if {@link #in} has an
-		 *                                            unterminated string literal
+		 * @throws MinificationException if {@link #in} has an unterminated comment,
+		 *                               string literal or regular expression literal
 		 */
-		String minify() throws UnterminatedRegExpLiteralException, UnterminatedCommentException,
-				UnterminatedStringLiteralException {
+		String minify() throws MinificationException {
 			theA = '\n';
 			action(Action.GET);
 			while (theA != EOF) {
@@ -371,26 +366,5 @@ public class JSMinifier implements Minifier {
 			}
 			return out.toString();
 		}
-	}
-
-	/**
-	 * Exception representing an unterminated comment.
-	 */
-	static class UnterminatedCommentException extends Exception {
-		private static final long serialVersionUID = 7971352218559346169L;
-	}
-
-	/**
-	 * Exception representing an unterminated string literal.
-	 */
-	static class UnterminatedStringLiteralException extends Exception {
-		private static final long serialVersionUID = 3813645314180522143L;
-	}
-
-	/**
-	 * Exception representing an unterminated regular expression literal.
-	 */
-	static class UnterminatedRegExpLiteralException extends Exception {
-		private static final long serialVersionUID = -5088088141334641219L;
 	}
 }

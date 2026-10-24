@@ -232,16 +232,32 @@ public abstract class AbstractMinifierTest {
 
 	/**
 	 * Tests that resource {@code filename} throws a {@link MinificationException}
-	 * caused by {@code expected}.
+	 * reporting {@code message} at {@code line} and {@code column}.
 	 *
 	 * @param filename a resource filename
-	 * @param expected expected cause
+	 * @param message  what the exception should say went wrong
+	 * @param line     the line the exception should report
+	 * @param column   the column the exception should report
 	 * @throws IOException if the resource can't be read
 	 */
-	protected void throwsOnMinify(String filename, Class<? extends Exception> expected) throws IOException {
-		String source = stringForResource(filename);
+	protected void throwsOnMinify(String filename, String message, int line, int column) throws IOException {
+		throwsOnMinifySource(stringForResource(filename), message, line, column);
+	}
+
+	/**
+	 * Tests that {@code source} throws a {@link MinificationException} reporting
+	 * {@code message} at {@code line} and {@code column}.
+	 *
+	 * @param source  the source to minify
+	 * @param message what the exception should say went wrong
+	 * @param line    the line the exception should report
+	 * @param column  the column the exception should report
+	 */
+	protected void throwsOnMinifySource(String source, String message, int line, int column) {
 		MinificationException e = assertThrows(MinificationException.class, () -> minifier().minify(source));
-		assertEquals(expected, e.getCause().getClass());
+		assertEquals(message + " at line " + line + ", column " + column, e.getMessage());
+		assertEquals(line, e.line());
+		assertEquals(column, e.column());
 	}
 
 	/**

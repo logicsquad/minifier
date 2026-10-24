@@ -45,10 +45,9 @@ to the other:
 It writes nothing unless minification succeeds, and it doesn't close
 either stream: that's up to you.
 
-A `MinificationException` will usually wrap some _other_
-exception, such as `CSSMinifier.UnterminatedCommentException`. If you
-need to know why minification failed, you can call `getCause()` on the
-exception you catch.
+A `MinificationException` says what went wrong, and where: its message
+is something like `Unterminated comment at line 12, column 5`, and
+`line()` and `column()` return the position, both numbered from 1.
 
 Using Minifier
 --------------

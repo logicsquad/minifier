@@ -33,7 +33,29 @@ public class JSMinifierTest extends AbstractMinifierTest {
 
 	@Test
 	public void unterminatedCommentThrowsException() throws IOException {
-		throwsOnMinify("exceptions/unterminated-comment.js", JSMinifier.UnterminatedCommentException.class);
+		throwsOnMinify("exceptions/unterminated-comment.js", "Unterminated comment", 1, 1);
+		return;
+	}
+
+	@Test
+	public void unterminatedStringLiteralThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-string.js", "Unterminated string literal", 2, 9);
+		return;
+	}
+
+	@Test
+	public void unterminatedRegExpLiteralThrowsException() throws IOException {
+		throwsOnMinify("exceptions/unterminated-regexp.js", "Unterminated regular expression literal", 2, 10);
+		return;
+	}
+
+	/**
+	 * Tests that "\r\n" and "\r" each count as one line break in where a problem
+	 * is reported.
+	 */
+	@Test
+	public void otherLineBreaksCountOnceInWhereProblemIs() {
+		throwsOnMinifySource("var a = 1;\r\n\rvar s = 'abc\r\n;", "Unterminated string literal", 3, 9);
 		return;
 	}
 
