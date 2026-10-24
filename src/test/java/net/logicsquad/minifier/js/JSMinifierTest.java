@@ -84,4 +84,16 @@ public class JSMinifierTest extends AbstractMinifierTest {
 		assertEquals("s='abc\\\ndef';", minify("s = 'abc\\\r\ndef';"));
 		assertEquals("s='abc\\\ndef';", minify("s = 'abc\\\rdef';"));
 	}
+
+	/**
+	 * Tests that input ending in "/" gains nothing at the end. Looking past the
+	 * end of the input once added U+FFFF to the output.
+	 *
+	 * @throws MinificationException if minification fails
+	 */
+	@Test
+	public void trailingSlashGainsNothing() throws MinificationException {
+		assertEquals("a=b/", minify("a = b /"));
+		assertEquals("if(x)/re/", minify("if (x) /re/"));
+	}
 }

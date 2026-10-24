@@ -180,7 +180,10 @@ public class JSMinifier extends AbstractMinifier {
 	 */
 	int peek() throws IOException {
 		int lookaheadChar = in.read();
-		in.unread(lookaheadChar);
+		// Pushed back, EOF would become a character, U+FFFF.
+		if (lookaheadChar != EOF) {
+			in.unread(lookaheadChar);
+		}
 		return lookaheadChar;
 	}
 
