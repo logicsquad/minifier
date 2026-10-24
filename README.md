@@ -62,6 +62,8 @@ dependency:
       <version>1.7</version>
     </dependency>
 
+On the module path, its module is `net.logicsquad.minifier`.
+
 If you're building a Maven project, and just want to minify project
 resources during the build, check out [Minifier Maven Plugin](https://github.com/logicsquad/minifier-maven-plugin),
 which uses Minifier to do the work.
