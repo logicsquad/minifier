@@ -1,7 +1,6 @@
 package net.logicsquad.minifier.css;
 
 import java.io.IOException;
-import java.io.Reader;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,8 +24,8 @@ public class CSSMinifierTest extends AbstractMinifierTest {
 	}
 
 	@Override
-	protected Minifier miniferForReader(Reader reader) {
-		return new CSSMinifier(reader);
+	protected Minifier minifier() {
+		return new CSSMinifier();
 	}
 
 	@Test

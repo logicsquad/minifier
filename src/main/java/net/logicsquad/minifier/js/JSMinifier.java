@@ -1,12 +1,7 @@
 package net.logicsquad.minifier.js;
 
-import java.io.IOException;
-import java.io.PushbackReader;
-import java.io.Reader;
-import java.io.Writer;
-
-import net.logicsquad.minifier.AbstractMinifier;
 import net.logicsquad.minifier.MinificationException;
+import net.logicsquad.minifier.Minifier;
 
 /**
  * Strips comments and whitespace from Javascript input.
@@ -16,36 +11,16 @@ import net.logicsquad.minifier.MinificationException;
  * @author John Reilly
  * @author Douglas Crockford
  */
-public class JSMinifier extends AbstractMinifier {
+public class JSMinifier implements Minifier {
 	/**
 	 * End of file
 	 */
 	private static final int EOF = -1;
 
 	/**
-	 * {@link PushbackReader} to wrap {@link Reader} supplied to constructor
+	 * Creates a {@code JSMinifier}, which can minify any number of scripts.
 	 */
-	private final PushbackReader in;
-
-	/**
-	 * First character in two-character "cursor" over source
-	 */
-	private int theA;
-
-	/**
-	 * Second character in two-character "cursor" over source
-	 */
-	private int theB;
-
-	/**
-	 * Constructor taking a {@link Reader} that will provide the input resource.
-	 *
-	 * @param reader a {@link Reader}
-	 */
-	public JSMinifier(Reader reader) {
-		super(reader);
-		this.in = new PushbackReader(reader);
-		return;
+	public JSMinifier() {
 	}
 
 	/**
@@ -62,86 +37,33 @@ public class JSMinifier extends AbstractMinifier {
 
 	/**
 	 * <p>
-	 * Returns next character from {@link #in}. If the character is a control
-	 * character, translates:
+	 * Returns {@code source}, minified, by deleting the characters which are
+	 * insignificant to Javascript. Specifically:
 	 * </p>
 	 *
 	 * <ul>
-	 * <li>{@code \r} to {@code \n}; and</li>
-	 * <li>everything else to a space.</li>
+	 * <li>comments will be removed;</li>
+	 * <li>tabs will be replaced with spaces;</li>
+	 * <li>carriage returns will be replaced with linefeeds; and</li>
+	 * <li>most spaces and linefeeds will be removed.</li>
 	 * </ul>
 	 *
-	 * @return next (translated) character from {@link #in}
-	 * @throws IOException if unable to {@link Reader#read()}
+	 * @param source a script
+	 * @return {@code source}, minified
+	 * @throws MinificationException if {@code source} can't be minified
 	 */
-	int get() throws IOException {
-		int c = in.read();
-		if (c >= ' ' || c == '\n' || c == EOF) {
-			return c;
+	@Override
+	public String minify(String source) throws MinificationException {
+		try {
+			return new Minification(source).minify();
+		} catch (UnterminatedCommentException | UnterminatedRegExpLiteralException
+				| UnterminatedStringLiteralException e) {
+			throw new MinificationException("Minification failed due to Exception.", e);
 		}
-		if (c == '\r') {
-			return '\n';
-		}
-		return ' ';
 	}
 
 	/**
-	 * Returns next character from {@link #in} (with no translation), without
-	 * removing it from {@link #in}. (That is, a subsequent call to {@link #get()}
-	 * will return the character again.)
-	 *
-	 * @return next character
-	 * @throws IOException if unable to {@link Reader#read()} or
-	 *                     {@link PushbackReader#unread(char[])}
-	 */
-	int peek() throws IOException {
-		int lookaheadChar = in.read();
-		in.unread(lookaheadChar);
-		return lookaheadChar;
-	}
-
-	/**
-	 * Returns the next character from {@link #in}, <em>excluding comments</em>.
-	 *
-	 * @return next character (excluding comments)
-	 * @throws IOException                  if thrown by {@link #get()} or
-	 *                                      {@link #peek()}
-	 * @throws UnterminatedCommentException if comment was unterminated
-	 */
-	int next() throws IOException, UnterminatedCommentException {
-		int c = get();
-		if (c == '/') {
-			switch (peek()) {
-			case '/':
-				for (;;) {
-					c = get();
-					if (c <= '\n') {
-						return c;
-					}
-				}
-			case '*':
-				get();
-				for (;;) {
-					switch (get()) {
-					case '*':
-						if (peek() == '/') {
-							get();
-							return ' ';
-						}
-						break;
-					case EOF:
-						throw new UnterminatedCommentException();
-					}
-				}
-			default:
-				return c;
-			}
-		}
-		return c;
-	}
-
-	/**
-	 * Represents an action for {@link #action(Action, Writer)} method.
+	 * Represents an action for {@link Minification#action(Action)}.
 	 */
 	private enum Action {
 		/**
@@ -161,115 +83,236 @@ public class JSMinifier extends AbstractMinifier {
 	}
 
 	/**
-	 * <p>
-	 * Performs an action based on {@code action}:
-	 * </p>
-	 *
-	 * <dl>
-	 * <dt>1</dt>
-	 * <dd>Output A. Copy B to A. Get the next B.</dd>
-	 * <dt>2</dt>
-	 * <dd>Copy B to A. Get the next B. (Delete A).</dd>
-	 * <dt>3</dt>
-	 * <dd>Get the next B. (Delete B).</dd>
-	 * </dl>
-	 *
-	 * <p>
-	 * String and regular expressions are treated as "single characters", in that
-	 * they are pushed through the pipeline in their entirety by a single call to
-	 * this method.
-	 * <p>
-	 *
-	 * @param action type of action
-	 * @param out    {@link Writer} for minified output
-	 * @throws IOException                        if thrown by {@link Reader} or
-	 *                                            {@link Writer}
-	 * @throws UnterminatedRegExpLiteralException if this method encounters an
-	 *                                            unterminated regular expression
-	 *                                            literal
-	 * @throws UnterminatedCommentException       if this method encounters an
-	 *                                            unterminated comment
-	 * @throws UnterminatedStringLiteralException if this method encounters an
-	 *                                            unterminated string literal
+	 * A single minification: its input, how far it has read, its two-character
+	 * "cursor" over the input, and its output so far. Each call to
+	 * {@link JSMinifier#minify(String)} has its own, so a {@code JSMinifier} keeps
+	 * no state between calls.
 	 */
-	void action(Action action, Writer out) throws IOException, UnterminatedRegExpLiteralException,
-			UnterminatedCommentException, UnterminatedStringLiteralException {
-		switch (action) {
-		case OUTPUT_COPY_GET:
-			out.write(theA);
-		case COPY_GET:
-			theA = theB;
-			if (theA == '\'' || theA == '`' || theA == '"') {
-				for (;;) {
-					out.write(theA);
-					theA = get();
-					if (theA == theB) {
-						break;
-					}
-					if (theA <= '\n') {
-						throw new UnterminatedStringLiteralException();
-					}
-					if (theA == '\\') {
-						out.write(theA);
-						theA = get();
-					}
-				}
-			}
-		case GET:
-			theB = next();
-			if (theB == '/' && (theA == '(' || theA == ',' || theA == '=' || theA == ':' || theA == '[' || theA == '!'
-					|| theA == '&' || theA == '|' || theA == '?' || theA == '{' || theA == '}' || theA == ';'
-					|| theA == '\n')) {
-				out.write(theA);
-				out.write(theB);
-				for (;;) {
-					theA = get();
-					if (theA == '/') {
-						break;
-					} else if (theA == '\\') {
-						out.write(theA);
-						theA = get();
-					} else if (theA <= '\n') {
-						throw new UnterminatedRegExpLiteralException();
-					}
-					out.write(theA);
-				}
-				theB = next();
-			}
-			break;
-		default:
-			throw new IllegalStateException("Unknown action: " + action);
-		}
-	}
+	private static class Minification {
+		/**
+		 * Source being minified
+		 */
+		private final String in;
 
-	/**
-	 * <p>
-	 * Copies from input to {@code writer}, deleting the characters which are
-	 * insignificant to Javascript. Specifically:
-	 * </p>
-	 *
-	 * <ul>
-	 * <li>comments will be removed;</li>
-	 * <li>tabs will be replaced with spaces;</li>
-	 * <li>carriage returns will be replaced with linefeeds; and</li>
-	 * <li>most spaces and linefeeds will be removed.</li>
-	 * </ul>
-	 *
-	 * @param writer {@link Writer} for output
-	 * @throws MinificationException if minification fails
-	 */
-	@Override
-	public void minify(Writer writer) throws MinificationException {
-		try {
+		/**
+		 * Index in {@link #in} of the next character to read
+		 */
+		private int pos;
+
+		/**
+		 * First character in two-character "cursor" over source
+		 */
+		private int theA;
+
+		/**
+		 * Second character in two-character "cursor" over source
+		 */
+		private int theB;
+
+		/**
+		 * Minified output
+		 */
+		private final StringBuilder out;
+
+		/**
+		 * Constructor taking the source to minify.
+		 *
+		 * @param in source to minify
+		 */
+		Minification(String in) {
+			this.in = in;
+			this.out = new StringBuilder(in.length());
+		}
+
+		/**
+		 * <p>
+		 * Returns next character from {@link #in}. If the character is a control
+		 * character, translates:
+		 * </p>
+		 *
+		 * <ul>
+		 * <li>{@code \r} to {@code \n}; and</li>
+		 * <li>everything else to a space.</li>
+		 * </ul>
+		 *
+		 * @return next (translated) character from {@link #in}, or {@link #EOF} at
+		 *         the end
+		 */
+		int get() {
+			if (pos >= in.length()) {
+				return EOF;
+			}
+			int c = in.charAt(pos++);
+			if (c >= ' ' || c == '\n') {
+				return c;
+			}
+			if (c == '\r') {
+				return '\n';
+			}
+			return ' ';
+		}
+
+		/**
+		 * Returns next character from {@link #in} (with no translation), without
+		 * removing it from {@link #in}. (That is, a subsequent call to {@link #get()}
+		 * will return the character again.)
+		 *
+		 * @return next character, or {@link #EOF} at the end
+		 */
+		int peek() {
+			return pos < in.length() ? in.charAt(pos) : EOF;
+		}
+
+		/**
+		 * Returns the next character from {@link #in}, <em>excluding comments</em>.
+		 *
+		 * @return next character (excluding comments)
+		 * @throws UnterminatedCommentException if comment was unterminated
+		 */
+		int next() throws UnterminatedCommentException {
+			int c = get();
+			if (c == '/') {
+				switch (peek()) {
+				case '/':
+					for (;;) {
+						c = get();
+						if (c <= '\n') {
+							return c;
+						}
+					}
+				case '*':
+					get();
+					for (;;) {
+						switch (get()) {
+						case '*':
+							if (peek() == '/') {
+								get();
+								return ' ';
+							}
+							break;
+						case EOF:
+							throw new UnterminatedCommentException();
+						}
+					}
+				default:
+					return c;
+				}
+			}
+			return c;
+		}
+
+		/**
+		 * Appends {@code c} to the output.
+		 *
+		 * @param c a character
+		 */
+		private void write(int c) {
+			out.append((char) c);
+		}
+
+		/**
+		 * <p>
+		 * Performs an action based on {@code action}:
+		 * </p>
+		 *
+		 * <dl>
+		 * <dt>1</dt>
+		 * <dd>Output A. Copy B to A. Get the next B.</dd>
+		 * <dt>2</dt>
+		 * <dd>Copy B to A. Get the next B. (Delete A).</dd>
+		 * <dt>3</dt>
+		 * <dd>Get the next B. (Delete B).</dd>
+		 * </dl>
+		 *
+		 * <p>
+		 * String and regular expressions are treated as "single characters", in that
+		 * they are pushed through the pipeline in their entirety by a single call to
+		 * this method.
+		 * <p>
+		 *
+		 * @param action type of action
+		 * @throws UnterminatedRegExpLiteralException if this method encounters an
+		 *                                            unterminated regular expression
+		 *                                            literal
+		 * @throws UnterminatedCommentException       if this method encounters an
+		 *                                            unterminated comment
+		 * @throws UnterminatedStringLiteralException if this method encounters an
+		 *                                            unterminated string literal
+		 */
+		void action(Action action) throws UnterminatedRegExpLiteralException, UnterminatedCommentException,
+				UnterminatedStringLiteralException {
+			switch (action) {
+			case OUTPUT_COPY_GET:
+				write(theA);
+			case COPY_GET:
+				theA = theB;
+				if (theA == '\'' || theA == '`' || theA == '"') {
+					for (;;) {
+						write(theA);
+						theA = get();
+						if (theA == theB) {
+							break;
+						}
+						if (theA <= '\n') {
+							throw new UnterminatedStringLiteralException();
+						}
+						if (theA == '\\') {
+							write(theA);
+							theA = get();
+						}
+					}
+				}
+			case GET:
+				theB = next();
+				if (theB == '/' && (theA == '(' || theA == ',' || theA == '=' || theA == ':' || theA == '['
+						|| theA == '!' || theA == '&' || theA == '|' || theA == '?' || theA == '{' || theA == '}'
+						|| theA == ';' || theA == '\n')) {
+					write(theA);
+					write(theB);
+					for (;;) {
+						theA = get();
+						if (theA == '/') {
+							break;
+						} else if (theA == '\\') {
+							write(theA);
+							theA = get();
+						} else if (theA <= '\n') {
+							throw new UnterminatedRegExpLiteralException();
+						}
+						write(theA);
+					}
+					theB = next();
+				}
+				break;
+			default:
+				throw new IllegalStateException("Unknown action: " + action);
+			}
+		}
+
+		/**
+		 * Minifies {@link #in}, deleting the characters which are insignificant to
+		 * Javascript.
+		 *
+		 * @return {@link #in}, minified
+		 * @throws UnterminatedRegExpLiteralException if {@link #in} has an
+		 *                                            unterminated regular expression
+		 *                                            literal
+		 * @throws UnterminatedCommentException       if {@link #in} has an
+		 *                                            unterminated comment
+		 * @throws UnterminatedStringLiteralException if {@link #in} has an
+		 *                                            unterminated string literal
+		 */
+		String minify() throws UnterminatedRegExpLiteralException, UnterminatedCommentException,
+				UnterminatedStringLiteralException {
 			theA = '\n';
-			action(Action.GET, writer);
+			action(Action.GET);
 			while (theA != EOF) {
 				switch (theA) {
 				case ' ':
 					if (isAlphanum(theB)) {
-						action(Action.OUTPUT_COPY_GET, writer);
+						action(Action.OUTPUT_COPY_GET);
 					} else {
-						action(Action.COPY_GET, writer);
+						action(Action.COPY_GET);
 					}
 					break;
 				case '\n':
@@ -279,16 +322,16 @@ public class JSMinifier extends AbstractMinifier {
 					case '(':
 					case '+':
 					case '-':
-						action(Action.OUTPUT_COPY_GET, writer);
+						action(Action.OUTPUT_COPY_GET);
 						break;
 					case ' ':
-						action(Action.GET, writer);
+						action(Action.GET);
 						break;
 					default:
 						if (isAlphanum(theB)) {
-							action(Action.OUTPUT_COPY_GET, writer);
+							action(Action.OUTPUT_COPY_GET);
 						} else {
-							action(Action.COPY_GET, writer);
+							action(Action.COPY_GET);
 						}
 					}
 					break;
@@ -296,10 +339,10 @@ public class JSMinifier extends AbstractMinifier {
 					switch (theB) {
 					case ' ':
 						if (isAlphanum(theA)) {
-							action(Action.OUTPUT_COPY_GET, writer);
+							action(Action.OUTPUT_COPY_GET);
 							break;
 						}
-						action(Action.GET, writer);
+						action(Action.GET);
 						break;
 					case '\n':
 						switch (theA) {
@@ -310,31 +353,23 @@ public class JSMinifier extends AbstractMinifier {
 						case '-':
 						case '"':
 						case '\'':
-							action(Action.OUTPUT_COPY_GET, writer);
+							action(Action.OUTPUT_COPY_GET);
 							break;
 						default:
 							if (isAlphanum(theA)) {
-								action(Action.OUTPUT_COPY_GET, writer);
+								action(Action.OUTPUT_COPY_GET);
 							} else {
-								action(Action.GET, writer);
+								action(Action.GET);
 							}
 						}
 						break;
 					default:
-						action(Action.OUTPUT_COPY_GET, writer);
+						action(Action.OUTPUT_COPY_GET);
 						break;
 					}
 				}
 			}
-		} catch (IOException | UnterminatedCommentException | UnterminatedRegExpLiteralException
-				| UnterminatedStringLiteralException e) {
-			throw new MinificationException("Minification failed due to Exception.", e);
-		} finally {
-			try {
-				writer.close();
-			} catch (IOException e) {
-				throw new MinificationException("Minification failed due to Exception.", e);
-			}
+			return out.toString();
 		}
 	}
 

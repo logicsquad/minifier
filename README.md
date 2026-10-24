@@ -20,24 +20,32 @@ There are two minifier classes:
 * `CSSMinifier` for CSS; and
 * `JSMinifier` for Javascript.
 
-They both implement `Minifier`, which declares a single method:
+They both implement `Minifier`, which takes the text of a resource and
+returns it minified:
 
-    void minify(Writer writer) throws MinificationException;
+    String minify(String source) throws MinificationException;
 
-Further, they both extend `AbstractMinifier`, which provides a
-constructor taking a `Reader` object. So you need a `Reader` and a
-`Writer` to minify a resource, and that's it. For example:
+A minifier keeps no state between calls, so a single instance can
+minify any number of resources, from any number of threads. For
+example:
 
-    Reader input = new FileReader("basic.css");
-    Writer output = new FileWriter("basic-min.css");
-    Minifier min = new CSSMinifier(input);
+    Minifier minifier = new CSSMinifier();
     try {
-        min.minify(output);
+        String minified = minifier.minify(css);
     } catch (MinificationException e) {
         // Handle exception
     }
 
-And that's it. A `MinificationException` will usually wrap some _other_
+If you have a `Reader` and a `Writer`, `Minifier` also has a default
+method that reads the whole resource from one, and writes it, minified,
+to the other:
+
+    void minify(Reader reader, Writer writer) throws IOException, MinificationException;
+
+It writes nothing unless minification succeeds, and it doesn't close
+either stream: that's up to you.
+
+A `MinificationException` will usually wrap some _other_
 exception, such as `CSSMinifier.UnterminatedCommentException`. If you
 need to know why minification failed, you can call `getCause()` on the
 exception you catch.

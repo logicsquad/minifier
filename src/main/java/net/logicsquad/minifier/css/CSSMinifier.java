@@ -1,10 +1,5 @@
 package net.logicsquad.minifier.css;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.Reader;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -17,8 +12,8 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.logicsquad.minifier.AbstractMinifier;
 import net.logicsquad.minifier.MinificationException;
+import net.logicsquad.minifier.Minifier;
 
 /**
  * Strips comments and whitespace from CSS input.
@@ -26,7 +21,7 @@ import net.logicsquad.minifier.MinificationException;
  * @author paulh
  * @author Barry van Oudtshoorn
  */
-public class CSSMinifier extends AbstractMinifier {
+public class CSSMinifier implements Minifier {
 	/**
 	 * Logger
 	 */
@@ -111,36 +106,32 @@ public class CSSMinifier extends AbstractMinifier {
 	private static final Pattern HONOURED_CHARSET = Pattern.compile("@charset \"[^\";]*\";");
 
 	/**
-	 * Constructor taking a {@link Reader} that will provide the input resource.
-	 *
-	 * @param reader a {@link Reader}
+	 * Creates a {@code CSSMinifier}, which can minify any number of stylesheets.
 	 */
-	public CSSMinifier(Reader reader) {
-		super(reader);
+	public CSSMinifier() {
 	}
 
 	/**
-	 * Copies from input to {@code writer}, minifying CSS content.
-	 * 
-	 * @param writer {@link Writer} for output
-	 * @throws MinificationException if minification fails
+	 * Returns {@code source}, minified.
+	 *
+	 * @param source a stylesheet
+	 * @return {@code source}, minified
+	 * @throws MinificationException if {@code source} can't be minified
 	 */
 	@Override
-	public void minify(Writer writer) throws MinificationException {
-		try (BufferedReader br = new BufferedReader(reader()); PrintWriter pout = new PrintWriter(writer)) {
+	public String minify(String source) throws MinificationException {
+		try {
 			int j, // Number of open braces
 					n; // Current position in stream
 			char curr;
 
-			// Keep the line breaks between lines: a line break is whitespace, which can
-			// separate tokens.
-			List<String> lines = new ArrayList<>();
-			String s;
-			while ((s = br.readLine()) != null) {
-				lines.add(s);
+			// A line break is whitespace, which can separate tokens, so line breaks are
+			// kept, as "\n". One at the very end isn't needed, and would end up inside a
+			// string or url() left open at the end.
+			String input = source.replace("\r\n", "\n").replace('\r', '\n');
+			if (input.endsWith("\n")) {
+				input = input.substring(0, input.length() - 1);
 			}
-
-			String input = String.join("\n", lines);
 			LOG.debug("Removing comments...");
 			String css = removeComments(input);
 			LOG.debug("Parsing and processing selectors...");
@@ -202,18 +193,10 @@ public class CSSMinifier extends AbstractMinifier {
 			// statement, has no rule to be output with, so output it here, along with
 			// anything still pending from a rule that was skipped.
 			output.append(Selector.minifySelector(pending + css.substring(n)));
-			pout.print(withoutIgnoredCharset(output.toString(), input));
-			pout.print("\r\n");
 			LOG.debug("Process completed successfully.");
-		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
-				| IOException e) {
+			return withoutIgnoredCharset(output.toString(), input) + "\r\n";
+		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException e) {
 			throw new MinificationException("Minification failed due to Exception.", e);
-		} finally {
-			try {
-				writer.close();
-			} catch (IOException e) {
-				throw new MinificationException("Minification failed due to Exception.", e);
-			}
 		}
 	}
 
