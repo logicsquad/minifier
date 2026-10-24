@@ -9,9 +9,6 @@ import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import net.logicsquad.minifier.MinificationException;
 import net.logicsquad.minifier.Minifier;
 
@@ -22,11 +19,6 @@ import net.logicsquad.minifier.Minifier;
  * @author Barry van Oudtshoorn
  */
 public final class CSSMinifier implements Minifier {
-	/**
-	 * Logger
-	 */
-	private static final Logger LOG = LoggerFactory.getLogger(CSSMinifier.class);
-
 	/**
 	 * Symbolic colour names defined by HTML
 	 */
@@ -131,9 +123,7 @@ public final class CSSMinifier implements Minifier {
 		if (input.endsWith("\n")) {
 			input = input.substring(0, input.length() - 1);
 		}
-		LOG.debug("Removing comments...");
 		String css = removeComments(input);
-		LOG.debug("Parsing and processing selectors...");
 		List<Selector> selectors = new ArrayList<>();
 		// When a rule is skipped, the statements and retained comments in front of it
 		// are kept, and output in front of whatever comes next.
@@ -190,13 +180,12 @@ public final class CSSMinifier implements Minifier {
 		// statement, has no rule to be output with, so output it here, along with
 		// anything still pending from a rule that was skipped.
 		output.append(Selector.minifySelector(pending + css.substring(n)));
-		LOG.debug("Process completed successfully.");
 		return withoutIgnoredCharset(output.toString(), input);
 	}
 
 	/**
 	 * Parses {@code rule} as a {@link Selector} and adds it to {@code selectors}. A
-	 * rule with an empty body is logged and skipped, unless it's an {@code @layer}
+	 * rule with an empty body is skipped, unless it's an {@code @layer}
 	 * block or {@code keepEmpty} is set. The statements and retained comments in
 	 * front of a skipped rule aren't skipped, though: they're returned, to be output
 	 * in front of whatever comes next.
@@ -217,11 +206,9 @@ public final class CSSMinifier implements Minifier {
 		// always is: it still declares its layer, which fixes where the layer comes in
 		// the layer order.
 		if (!body.isEmpty() || keepEmpty || Selector.isLayerBlock(header)) {
-			LOG.debug("Parsing selector: {}", header.trim());
 			selectors.add(new Selector(header, body));
 			return "";
 		}
-		LOG.debug("Empty selector body: {}", rule);
 		return header.substring(0, Selector.preludeStart(header));
 	}
 
@@ -839,8 +826,7 @@ public final class CSSMinifier implements Minifier {
 
 		/**
 		 * Parses {@code declaration} as a {@link Property} and adds it to this
-		 * Selector's contents. Blank declarations are ignored, and incomplete ones are
-		 * logged and skipped.
+		 * Selector's contents. Blank and incomplete declarations are skipped.
 		 *
 		 * @param declaration a single "name: value" declaration
 		 */
@@ -849,9 +835,7 @@ public final class CSSMinifier implements Minifier {
 				return;
 			}
 			Property property = Property.parse(declaration);
-			if (property == null) {
-				LOG.debug("Incomplete property in selector '{}': {}", selector, declaration);
-			} else {
+			if (property != null) {
 				this.contents.add(property);
 			}
 		}
@@ -914,7 +898,6 @@ public final class CSSMinifier implements Minifier {
 			boolean bCanSplit = true;
 			int j = 0;
 			String substr;
-			LOG.debug("\t\tExamining property: {}", property);
 			for (int i = 0; i < property.length(); i++) {
 				if (!bCanSplit) { // If we're inside a string
 					bCanSplit = (property.charAt(i) == '"');
@@ -966,9 +949,7 @@ public final class CSSMinifier implements Minifier {
 			StringBuffer sb = new StringBuffer();
 			sb.append(this.comments).append(this.property).append(":");
 			for (Part p : this.parts) {
-				if (p != null) {
-					sb.append(p.toString()).append(",");
-				}
+				sb.append(p.toString()).append(",");
 			}
 			sb.deleteCharAt(sb.length() - 1); // Delete the trailing comma.
 			sb.append(";");
@@ -986,13 +967,7 @@ public final class CSSMinifier implements Minifier {
 			List<Part> results = new ArrayList<>(parts.length);
 
 			for (int i = 0; i < parts.length; i++) {
-				try {
-					results.add(new Part(parts[i], property));
-				} catch (Exception e) {
-					// Drop a part we can't parse rather than retaining a null, which
-					// toString() would later dereference.
-					LOG.debug("Exception in parseValues().", e);
-				}
+				results.add(new Part(parts[i], property));
 			}
 
 			return results.toArray(new Part[0]);
@@ -1099,9 +1074,8 @@ public final class CSSMinifier implements Minifier {
 		 * Create a new property by parsing the given string.
 		 *
 		 * @param contents The string to parse.
-		 * @throws Exception If the part cannot be parsed.
 		 */
-		public Part(String contents, String property) throws Exception {
+		public Part(String contents, String property) {
 			// Many of these regular expressions are adapted from those used in the YUI CSS
 			// Compressor.
 
