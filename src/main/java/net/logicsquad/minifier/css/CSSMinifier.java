@@ -302,11 +302,10 @@ public class CSSMinifier extends AbstractMinifier {
 	 * Represents a CSS selector.
 	 */
 	private static class Selector {
-		private Property[] properties = null;
-		private List<Selector> subSelectors = null;
-		// Statements after the last nested rule, such as "@layer a, b;". (Those in front
-		// of a nested rule are output with it, in front of its selector.)
-		private String statements = "";
+		// The rule's contents, in their original order: declarations (each a Property),
+		// nested rules (each a Selector) and statements (each a String, such as
+		// "@layer a,b;")
+		private final List<Object> contents = new ArrayList<>();
 		private String selector;
 
 		/**
@@ -355,8 +354,8 @@ public class CSSMinifier extends AbstractMinifier {
 
 		/**
 		 * Initialises this Selector from its (raw) header and its body, parsing the
-		 * body into nested selectors, statements and/or properties. Handles
-		 * arbitrarily deep CSS nesting via recursion.
+		 * body into its contents: declarations, nested selectors and statements, in
+		 * their original order. Handles arbitrarily deep CSS nesting via recursion.
 		 *
 		 * @param header the raw selector text
 		 * @param body   the selector body, without its enclosing braces
@@ -369,11 +368,7 @@ public class CSSMinifier extends AbstractMinifier {
 			if (body.endsWith(";")) {
 				body = body.substring(0, body.length() - 1);
 			}
-			this.subSelectors = new ArrayList<>();
-			List<Property> props = new ArrayList<>();
 			StringBuilder pending = new StringBuilder();
-			// Statements, such as "@layer a, b;", in front of the next nested rule
-			StringBuilder statements = new StringBuilder();
 			int i = 0;
 			while (i < body.length()) {
 				char c = body.charAt(i);
@@ -392,15 +387,12 @@ public class CSSMinifier extends AbstractMinifier {
 				} else if (c == '{') {
 					// A nested rule starts here. Declarations and statements were flushed at
 					// their ';', so "pending" now holds only this nested selector's header.
-					// Any statements in front of the rule are output with it, in front of
-					// its selector, as they are at the top level.
 					int j = matchingBrace(body, i);
-					this.subSelectors.add(new Selector(statements.toString() + pending, body.substring(i + 1, j - 1)));
-					statements.setLength(0);
+					this.contents.add(new Selector(pending.toString(), body.substring(i + 1, j - 1)));
 					pending.setLength(0);
 					i = j;
 				} else if (c == ';') {
-					addStatementOrProperty(statements, props, pending.toString());
+					addStatementOrProperty(pending.toString());
 					pending.setLength(0);
 					i++;
 				} else {
@@ -409,10 +401,7 @@ public class CSSMinifier extends AbstractMinifier {
 				}
 			}
 			// A trailing declaration or statement with no terminating semicolon.
-			addStatementOrProperty(statements, props, pending.toString());
-			this.statements = minifySelector(statements.toString());
-			this.properties = props.toArray(new Property[0]);
-			sortProperties(this.properties);
+			addStatementOrProperty(pending.toString());
 		}
 
 		/**
@@ -739,83 +728,66 @@ public class CSSMinifier extends AbstractMinifier {
 		}
 
 		/**
-		 * Adds {@code text}, from a rule's body, to {@code statements} if it's an
-		 * at-rule statement, such as "@layer a, b", or else parses it as a declaration
-		 * and adds it to {@code props}.
+		 * Adds {@code text}, from a rule's body, to this Selector's contents: as a
+		 * statement if it's an at-rule statement, such as "@layer a, b", or else as a
+		 * declaration.
 		 *
-		 * @param statements the statements in front of the next nested rule
-		 * @param props      list to add a declaration to
-		 * @param text       a single statement or declaration, without its ";"
+		 * @param text a single statement or declaration, without its ";"
 		 */
-		private void addStatementOrProperty(StringBuilder statements, List<Property> props, String text) {
+		private void addStatementOrProperty(String text) {
 			int start = preludeStart(text);
 			if (start < text.length() && text.charAt(start) == '@') {
-				statements.append(text).append(';');
+				this.contents.add(minifySelector(text + ";"));
 			} else {
-				addProperty(props, text);
+				addProperty(text);
 			}
 		}
 
 		/**
-		 * Parses {@code declaration} as a {@link Property} and adds it to
-		 * {@code props}. Blank declarations are ignored, and incomplete ones are
+		 * Parses {@code declaration} as a {@link Property} and adds it to this
+		 * Selector's contents. Blank declarations are ignored, and incomplete ones are
 		 * logged and skipped.
 		 *
-		 * @param props       list to add the parsed property to
 		 * @param declaration a single "name: value" declaration
 		 */
-		private void addProperty(List<Property> props, String declaration) {
+		private void addProperty(String declaration) {
 			if (declaration.trim().isEmpty()) {
 				return;
 			}
 			try {
-				props.add(new Property(declaration));
+				this.contents.add(new Property(declaration));
 			} catch (IncompletePropertyException ipex) {
 				LOG.debug("Incomplete property in selector '{}': {}", selector, ipex.getMessage());
 			}
 		}
 
 		/**
-		 * Prints out this selector and its contents nicely, with the contents sorted
-		 * alphabetically.
+		 * Prints out this selector and its contents, in their original order. (A later
+		 * declaration wins over an earlier one, so reordering them could change which
+		 * value applies.)
 		 *
 		 * @returns A string representing this selector, minified.
 		 */
 		public String toString() {
 			StringBuffer sb = new StringBuffer();
 			sb.append(this.selector).append("{");
-			if (this.subSelectors != null) {
-				for (Selector s : this.subSelectors) {
-					sb.append(s.toString());
-				}
+			for (Object item : this.contents) {
+				sb.append(item);
 			}
-			sb.append(this.statements);
-			if (this.properties != null && this.properties.length > 0) {
-				for (Property p : this.properties) {
-					sb.append(p.toString());
-				}
-				// The last declaration doesn't need its ";". (A statement keeps its own,
-				// since ending one with the "}" is a parse error.)
+			// The last declaration doesn't need its ";". (A statement keeps its own,
+			// since ending one with the "}" is a parse error.)
+			if (!this.contents.isEmpty() && this.contents.get(this.contents.size() - 1) instanceof Property) {
 				sb.deleteCharAt(sb.length() - 1);
 			}
 			sb.append("}");
 			return sb.toString();
-		}
-
-		/**
-		 * Sorts the properties array to enhance gzipping.
-		 *
-		 * @param properties The array to be sorted.
-		 */
-		private void sortProperties(Property[] properties) {
-			Arrays.sort(properties);
 		}
 	}
 
 	/**
 	 * Represents a CSS property.
 	 */
-	private static class Property implements Comparable<Property> {
+	private static class Property {
 		protected String property;
 		protected Part[] parts;
 		// Any retained comments in front of the declaration, copied through unchanged
@@ -894,32 +866,6 @@ public class CSSMinifier extends AbstractMinifier {
 			sb.deleteCharAt(sb.length() - 1); // Delete the trailing comma.
 			sb.append(";");
 			return sb.toString();
-		}
-
-		/**
-		 * Compare this property with another.
-		 */
-		public int compareTo(Property other) {
-			// We can't just use String.compareTo(), because we need to sort properties that
-			// have hack prefixes last -- eg, *display should come after display.
-			String thisProp = this.property;
-			String thatProp = other.property;
-
-			if (thisProp.charAt(0) == '-') {
-				thisProp = thisProp.substring(1);
-				thisProp = thisProp.substring(thisProp.indexOf('-') + 1);
-			} else if (thisProp.charAt(0) < 65) {
-				thisProp = thisProp.substring(1);
-			}
-
-			if (thatProp.charAt(0) == '-') {
-				thatProp = thatProp.substring(1);
-				thatProp = thatProp.substring(thatProp.indexOf('-') + 1);
-			} else if (thatProp.charAt(0) < 65) {
-				thatProp = thatProp.substring(1);
-			}
-
-			return thisProp.compareTo(thatProp);
 		}
 
 		/**

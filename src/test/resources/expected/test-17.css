@@ -1,1 +1,1 @@
-:root{--MYcolor2:orange;--mYcolor:#000}.folioViewer>.pane>.list.busy::after{background:var(--MYcolor2);color:var( --mYcolor)}
+:root{--mYcolor:#000;--MYcolor2:orange}.folioViewer>.pane>.list.busy::after{color:var( --mYcolor);background:var(--MYcolor2)}

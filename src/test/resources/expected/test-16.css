@@ -1,1 +1,1 @@
-.folioViewer>.pane>.list.busy::after{animation-duration:0.5s;animation-iteration-count:infinite;animation-name:Folioviewer-listspinner;animation-timing-function:ease-in-out}
+.folioViewer>.pane>.list.busy::after{animation-name:Folioviewer-listspinner;animation-duration:0.5s;animation-iteration-count:infinite;animation-timing-function:ease-in-out}
