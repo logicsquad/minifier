@@ -5,7 +5,10 @@ import java.io.PushbackReader;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
 
 import net.logicsquad.minifier.AbstractMinifier;
 import net.logicsquad.minifier.MinificationException;
@@ -23,6 +26,24 @@ public class JSMinifier extends AbstractMinifier {
 	 * End of file
 	 */
 	private static final int EOF = -1;
+
+	/**
+	 * Keywords that a regular expression literal can follow
+	 */
+	private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList("case", "delete", "do", "else", "in",
+			"instanceof", "new", "return", "throw", "typeof", "void"));
+
+	/**
+	 * Keywords whose condition, in parentheses, a regular expression literal can
+	 * follow, as in {@code if (x) /re/.test(s)}
+	 */
+	private static final Set<String> CONDITIONS = new HashSet<>(Arrays.asList("for", "if", "while", "with"));
+
+	/**
+	 * Number of characters {@link #written} holds, enough for the longest of
+	 * {@link #KEYWORDS} and the character in front of it
+	 */
+	private static final int WRITTEN = 16;
 
 	/**
 	 * {@link PushbackReader} to wrap {@link Reader} supplied to constructor
@@ -63,11 +84,30 @@ public class JSMinifier extends AbstractMinifier {
 	private final Deque<Integer> substitutions = new ArrayDeque<>();
 
 	/**
-	 * Whether {@link #theA} is the "/" that ends a regular expression literal,
-	 * which whitespace has to keep apart from a word after it, as it would an
-	 * identifier: in {@code /re/in}, "in" would be the literal's flags
+	 * Whether {@link #theA} is the "/" that ends a regular expression literal, or
+	 * whitespace after one. Whitespace has to keep the literal apart from a word
+	 * after it, as it would an identifier: in {@code /re/in}, "in" would be the
+	 * literal's flags. And a "/" after it is division.
 	 */
-	private boolean theAEndsRegExp;
+	private boolean afterRegExp;
+
+	/**
+	 * For each "(" open at this point, innermost first, whether it starts the
+	 * condition of one of {@link #CONDITIONS}
+	 */
+	private final Deque<Boolean> parentheses = new ArrayDeque<>();
+
+	/**
+	 * Whether {@link #theA} is the ")" that ends the condition of one of
+	 * {@link #CONDITIONS}, or whitespace after one, which a regular expression
+	 * literal can follow
+	 */
+	private boolean afterCondition;
+
+	/**
+	 * The last characters written, for seeing what comes before a "/"
+	 */
+	private final StringBuilder written = new StringBuilder(WRITTEN);
 
 	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
@@ -187,6 +227,75 @@ public class JSMinifier extends AbstractMinifier {
 	}
 
 	/**
+	 * Writes {@code c} to {@code out}, and remembers it in {@link #written}.
+	 *
+	 * @param out {@link Writer} for minified output
+	 * @param c   a character
+	 * @throws IOException if thrown by {@code out}
+	 */
+	private void write(Writer out, int c) throws IOException {
+		out.write(c);
+		if (written.length() == WRITTEN) {
+			written.deleteCharAt(0);
+		}
+		written.append((char) c);
+	}
+
+	/**
+	 * Returns the word that ends at {@code end} in {@code s}, or an empty string
+	 * if there isn't one, or it's a property, after a ".", which can have the
+	 * same name as a keyword, as in {@code a.return / 2}.
+	 *
+	 * @param s   characters written
+	 * @param end an index into {@code s}
+	 * @return the word that ends at {@code end}, unless it's a property
+	 */
+	private static String wordBefore(CharSequence s, int end) {
+		int start = end;
+		while (start > 0 && isAlphanum(s.charAt(start - 1))) {
+			start--;
+		}
+		return start > 0 && s.charAt(start - 1) == '.' ? "" : s.subSequence(start, end).toString();
+	}
+
+	/**
+	 * Returns whether a regular expression literal can start after
+	 * {@link #theA}: whether what comes before it, skipping whitespace, is the
+	 * start of the input, one of {@link #KEYWORDS}, the condition of one of
+	 * {@link #CONDITIONS}, or an operator or other punctuator that an expression
+	 * can follow. After anything else, such as an identifier, another ")" or a
+	 * regular expression literal, a "/" is division.
+	 *
+	 * @return {@code true} if a "/" after {@link #theA} starts a regular
+	 *         expression literal
+	 */
+	private boolean regExpCanFollow() {
+		if (afterRegExp) {
+			return false;
+		}
+		StringBuilder before = new StringBuilder(written);
+		if (theA != ' ' && theA != '\n') {
+			before.append((char) theA);
+		}
+		int end = before.length();
+		if (end == 0) {
+			return true;
+		}
+		char c = before.charAt(end - 1);
+		if (isAlphanum(c)) {
+			return KEYWORDS.contains(wordBefore(before, end));
+		}
+		if (c == ')') {
+			return afterCondition;
+		}
+		if ((c == '+' || c == '-') && end > 1 && before.charAt(end - 2) == c) {
+			// The "++" or "--" after an operand, as in "a++ / 2"
+			return false;
+		}
+		return "(,=:[!&|?+-~*/{};<>%^".indexOf(c) >= 0;
+	}
+
+	/**
 	 * Represents an action for {@link #action(Action, Writer)} method.
 	 */
 	private enum Action {
@@ -242,19 +351,20 @@ public class JSMinifier extends AbstractMinifier {
 			UnterminatedCommentException, UnterminatedStringLiteralException {
 		switch (action) {
 		case OUTPUT_COPY_GET:
-			out.write(theA);
+			write(out, theA);
 			// Two of "+", "-", "*" and "/" can run together into a different token, as
 			// "+ +" would into "++", so keep the whitespace that came between them.
 			if ((theY == ' ' || theY == '\n') && (theA == '+' || theA == '-' || theA == '*' || theA == '/')
 					&& (theB == '+' || theB == '-' || theB == '*' || theB == '/')) {
-				out.write(theY);
+				write(out, theY);
 			}
 		case COPY_GET:
+			afterRegExp = afterRegExp && (theB == ' ' || theB == '\n');
+			afterCondition = afterCondition && (theB == ' ' || theB == '\n');
 			theA = theB;
-			theAEndsRegExp = false;
 			if (theA == '\'' || theA == '"') {
 				for (;;) {
-					out.write(theA);
+					write(out, theA);
 					theA = read();
 					if (theA == theB) {
 						break;
@@ -263,7 +373,7 @@ public class JSMinifier extends AbstractMinifier {
 						throw new UnterminatedStringLiteralException();
 					}
 					if (theA == '\\') {
-						out.write(theA);
+						write(out, theA);
 						theA = read();
 					}
 				}
@@ -276,26 +386,39 @@ public class JSMinifier extends AbstractMinifier {
 				depth++;
 			} else if (theA == '}') {
 				depth--;
+			} else if (theA == '(') {
+				int end = written.length();
+				while (end > 0 && (written.charAt(end - 1) == ' ' || written.charAt(end - 1) == '\n')) {
+					end--;
+				}
+				parentheses.push(CONDITIONS.contains(wordBefore(written, end)));
+			} else if (theA == ')') {
+				afterCondition = !parentheses.isEmpty() && parentheses.pop();
 			}
 		case GET:
 			theB = next();
-			if (theB == '/' && (theA == '(' || theA == ',' || theA == '=' || theA == ':' || theA == '[' || theA == '!'
-					|| theA == '&' || theA == '|' || theA == '?' || theA == '{' || theA == '}' || theA == ';'
-					|| theA == '\n')) {
-				out.write(theA);
-				out.write(theB);
+			if (theB == '/' && regExpCanFollow()) {
+				// A space after a keyword can go, but a line break can end a statement.
+				if (theA != ' ') {
+					write(out, theA);
+				}
+				// Keep "/" and "*" apart from the "/", as "/ /" would run together into "//".
+				if (theA == '/' || theA == '*') {
+					write(out, ' ');
+				}
+				write(out, theB);
 				for (;;) {
 					theA = read();
 					if (theA == '[') {
 						// A "/" in a character class doesn't end the literal.
 						for (;;) {
-							out.write(theA);
+							write(out, theA);
 							theA = read();
 							if (theA == ']') {
 								break;
 							}
 							if (theA == '\\') {
-								out.write(theA);
+								write(out, theA);
 								theA = read();
 							}
 							if (theA == '\n' || theA == EOF) {
@@ -305,15 +428,15 @@ public class JSMinifier extends AbstractMinifier {
 					} else if (theA == '/') {
 						break;
 					} else if (theA == '\\') {
-						out.write(theA);
+						write(out, theA);
 						theA = read();
 					}
 					if (theA == '\n' || theA == EOF) {
 						throw new UnterminatedRegExpLiteralException();
 					}
-					out.write(theA);
+					write(out, theA);
 				}
-				theAEndsRegExp = true;
+				afterRegExp = true;
 				theB = next();
 			}
 			break;
@@ -337,19 +460,19 @@ public class JSMinifier extends AbstractMinifier {
 	 */
 	private void copyTemplate(Writer out) throws IOException, UnterminatedStringLiteralException {
 		for (;;) {
-			out.write(theA);
+			write(out, theA);
 			theA = read();
 			if (theA == '`') {
 				return;
 			}
 			if (theA == '$' && peek() == '{') {
-				out.write(theA);
+				write(out, theA);
 				theA = read();
 				substitutions.push(depth);
 				return;
 			}
 			if (theA == '\\') {
-				out.write(theA);
+				write(out, theA);
 				theA = read();
 			}
 			if (theA == EOF) {
@@ -415,7 +538,7 @@ public class JSMinifier extends AbstractMinifier {
 				default:
 					switch (theB) {
 					case ' ':
-						if (isAlphanum(theA) || theAEndsRegExp) {
+						if (isAlphanum(theA) || afterRegExp) {
 							action(Action.OUTPUT_COPY_GET, writer);
 							break;
 						}
@@ -434,7 +557,7 @@ public class JSMinifier extends AbstractMinifier {
 							action(Action.OUTPUT_COPY_GET, writer);
 							break;
 						default:
-							if (isAlphanum(theA) || theAEndsRegExp) {
+							if (isAlphanum(theA) || afterRegExp) {
 								action(Action.OUTPUT_COPY_GET, writer);
 							} else {
 								action(Action.GET, writer);
