@@ -1,4 +1,4 @@
-![](https://github.com/logicsquad/minifier/workflows/build/badge.svg)
+[![Build](https://github.com/logicsquad/minifier/actions/workflows/build.yml/badge.svg)](https://github.com/logicsquad/minifier/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/License-BSD-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
 Minifier
@@ -11,14 +11,12 @@ web resources. The key word is "safely": the aim is _not_ to produce
 maximal size reduction, nor introduce any morphological changes, but
 to provide _reasonable_ file size reduction in most cases.
 
-At launch, we will provide classes to minify Javascript and CSS.
-
 Getting started
 ---------------
 There are two minifier classes:
 
 * `CSSMinifier` for CSS; and
-* `JSMinifier` for Javascript.
+* `JSMinifier` for JavaScript.
 
 They both implement `Minifier`, which takes the text of a resource and
 returns it minified:
@@ -27,7 +25,7 @@ returns it minified:
 
 A minifier keeps no state between calls, so a single instance can
 minify any number of resources, from any number of threads. For
-example:
+example, to minify a stylesheet in `css`:
 
     Minifier minifier = new CSSMinifier();
     try {
@@ -71,7 +69,7 @@ to contribute.
 
 References
 ----------
-Javascript minification is based on Douglas Crockford's [original
+JavaScript minification is based on Douglas Crockford's [original
 C-based JSMin](https://github.com/douglascrockford/JSMin), via a
 [translation from C to
 Java](https://github.com/galan/packtag/blob/master/packtag-core/src/main/java/net/sf/packtag/implementation/JSMin.java)
