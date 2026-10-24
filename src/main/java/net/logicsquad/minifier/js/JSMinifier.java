@@ -72,26 +72,38 @@ public class JSMinifier extends AbstractMinifier {
 	}
 
 	/**
-	 * <p>
-	 * Returns next character from {@link #in}. If the character is a control
-	 * character, translates:
-	 * </p>
+	 * Returns next character from {@link #in}, reading a {@code \r\n} or
+	 * {@code \r} line break as {@code \n}. The characters in a literal are read
+	 * with this method, so that they're copied as they are.
 	 *
-	 * <ul>
-	 * <li>{@code \r} to {@code \n}; and</li>
-	 * <li>everything else to a space.</li>
-	 * </ul>
+	 * @return next character from {@link #in}
+	 * @throws IOException if unable to {@link Reader#read()} or
+	 *                     {@link PushbackReader#unread(int)}
+	 */
+	int read() throws IOException {
+		int c = in.read();
+		if (c == '\r') {
+			int d = in.read();
+			if (d != '\n' && d != EOF) {
+				in.unread(d);
+			}
+			return '\n';
+		}
+		return c;
+	}
+
+	/**
+	 * Returns next character from {@link #in}, as {@link #read()} does, but with
+	 * any other control character, such as a tab, translated to a space.
 	 *
 	 * @return next (translated) character from {@link #in}
-	 * @throws IOException if unable to {@link Reader#read()}
+	 * @throws IOException if unable to {@link Reader#read()} or
+	 *                     {@link PushbackReader#unread(int)}
 	 */
 	int get() throws IOException {
-		int c = in.read();
+		int c = read();
 		if (c >= ' ' || c == '\n' || c == EOF) {
 			return c;
-		}
-		if (c == '\r') {
-			return '\n';
 		}
 		return ' ';
 	}
@@ -221,16 +233,16 @@ public class JSMinifier extends AbstractMinifier {
 			if (theA == '\'' || theA == '`' || theA == '"') {
 				for (;;) {
 					out.write(theA);
-					theA = get();
+					theA = read();
 					if (theA == theB) {
 						break;
 					}
-					if (theA <= '\n') {
+					if (theA == '\n' || theA == EOF) {
 						throw new UnterminatedStringLiteralException();
 					}
 					if (theA == '\\') {
 						out.write(theA);
-						theA = get();
+						theA = read();
 					}
 				}
 			}
@@ -242,13 +254,13 @@ public class JSMinifier extends AbstractMinifier {
 				out.write(theA);
 				out.write(theB);
 				for (;;) {
-					theA = get();
+					theA = read();
 					if (theA == '/') {
 						break;
 					} else if (theA == '\\') {
 						out.write(theA);
-						theA = get();
-					} else if (theA <= '\n') {
+						theA = read();
+					} else if (theA == '\n' || theA == EOF) {
 						throw new UnterminatedRegExpLiteralException();
 					}
 					out.write(theA);
