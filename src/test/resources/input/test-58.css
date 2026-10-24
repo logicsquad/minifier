@@ -1,0 +1,10 @@
+@layer framework {
+    @layer reset, base;
+    @layer base { a { color: red } }
+    @layer reset { a { color: blue } }
+    @layer extra;
+}
+@media screen {
+    /** Kept with the statement after it. */
+    @layer print, screen;
+}
