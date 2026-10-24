@@ -38,6 +38,17 @@ public class JSMinifier extends AbstractMinifier {
 	private int theB;
 
 	/**
+	 * Last character returned by {@link #next()}
+	 */
+	private int theX = EOF;
+
+	/**
+	 * Character returned by {@link #next()} before {@link #theX}, which shows
+	 * whether whitespace came between A and B
+	 */
+	private int theY = EOF;
+
+	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
 	 *
 	 * @param reader a {@link Reader}
@@ -101,7 +112,10 @@ public class JSMinifier extends AbstractMinifier {
 	}
 
 	/**
-	 * Returns the next character from {@link #in}, <em>excluding comments</em>.
+	 * Returns the next character from {@link #in}, <em>excluding comments</em>: a
+	 * block comment is returned as a space, and a line comment as the line break
+	 * that ends it. The character is also remembered in {@link #theX}, and the one
+	 * before it in {@link #theY}.
 	 *
 	 * @return next character (excluding comments)
 	 * @throws IOException                  if thrown by {@link #get()} or
@@ -113,30 +127,29 @@ public class JSMinifier extends AbstractMinifier {
 		if (c == '/') {
 			switch (peek()) {
 			case '/':
-				for (;;) {
+				do {
 					c = get();
-					if (c <= '\n') {
-						return c;
-					}
-				}
+				} while (c > '\n');
+				break;
 			case '*':
 				get();
-				for (;;) {
+				while (c != ' ') {
 					switch (get()) {
 					case '*':
 						if (peek() == '/') {
 							get();
-							return ' ';
+							c = ' ';
 						}
 						break;
 					case EOF:
 						throw new UnterminatedCommentException();
 					}
 				}
-			default:
-				return c;
+				break;
 			}
 		}
+		theY = theX;
+		theX = c;
 		return c;
 	}
 
@@ -197,6 +210,12 @@ public class JSMinifier extends AbstractMinifier {
 		switch (action) {
 		case OUTPUT_COPY_GET:
 			out.write(theA);
+			// Two of "+", "-", "*" and "/" can run together into a different token, as
+			// "+ +" would into "++", so keep the whitespace that came between them.
+			if ((theY == ' ' || theY == '\n') && (theA == '+' || theA == '-' || theA == '*' || theA == '/')
+					&& (theB == '+' || theB == '-' || theB == '*' || theB == '/')) {
+				out.write(theY);
+			}
 		case COPY_GET:
 			theA = theB;
 			if (theA == '\'' || theA == '`' || theA == '"') {
