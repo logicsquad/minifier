@@ -369,6 +369,10 @@ public class JSMinifier extends AbstractMinifier {
 					case '(':
 					case '+':
 					case '-':
+					case '!':
+					case '~':
+					case '"':
+					case '\'':
 						action(Action.OUTPUT_COPY_GET, writer);
 						break;
 					case ' ':
@@ -400,6 +404,7 @@ public class JSMinifier extends AbstractMinifier {
 						case '-':
 						case '"':
 						case '\'':
+						case '`':
 							action(Action.OUTPUT_COPY_GET, writer);
 							break;
 						default:
