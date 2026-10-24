@@ -105,6 +105,12 @@ public class CSSMinifier extends AbstractMinifier {
 			"border-image-repeat"));
 
 	/**
+	 * An {@code @charset} statement in the only form that browsers honour, which they
+	 * only do at the very start of a stylesheet
+	 */
+	private static final Pattern HONOURED_CHARSET = Pattern.compile("@charset \"[^\";]*\";");
+
+	/**
 	 * Constructor taking a {@link Reader} that will provide the input resource.
 	 *
 	 * @param reader a {@link Reader}
@@ -134,8 +140,9 @@ public class CSSMinifier extends AbstractMinifier {
 				lines.add(s);
 			}
 
+			String input = String.join("\n", lines);
 			LOG.debug("Removing comments...");
-			String css = removeComments(String.join("\n", lines));
+			String css = removeComments(input);
 			LOG.debug("Parsing and processing selectors...");
 			List<Selector> selectors = new ArrayList<>();
 			// When a rule is skipped, the statements and retained comments in front of it
@@ -187,13 +194,15 @@ public class CSSMinifier extends AbstractMinifier {
 				n = css.length();
 			}
 
+			StringBuilder output = new StringBuilder();
 			for (Selector selector : selectors) {
-				pout.print(selector.toString());
+				output.append(selector);
 			}
 			// Anything after the last rule, such as a retained comment or an @layer
 			// statement, has no rule to be output with, so output it here, along with
 			// anything still pending from a rule that was skipped.
-			pout.print(Selector.minifySelector(pending + css.substring(n)));
+			output.append(Selector.minifySelector(pending + css.substring(n)));
+			pout.print(withoutIgnoredCharset(output.toString(), input));
 			pout.print("\r\n");
 			LOG.debug("Process completed successfully.");
 		} catch (UnterminatedCommentException | UnbalancedBracesException | IncompleteSelectorException
@@ -251,6 +260,28 @@ public class CSSMinifier extends AbstractMinifier {
 			}
 		}
 		return -1;
+	}
+
+	/**
+	 * Returns {@code output} without any {@code @charset} statements at its start
+	 * that {@code input} doesn't start with. Browsers only honour {@code @charset}
+	 * at the very start of a stylesheet, written exactly as {@code @charset "name";},
+	 * and ignore it anywhere else, so one that minifying has moved to the start, or
+	 * rewritten into that form, would change how they decode the stylesheet. Since
+	 * browsers ignored it, dropping it changes nothing.
+	 *
+	 * @param output the minified stylesheet
+	 * @param input  the stylesheet before minifying
+	 * @return {@code output}, without any {@code @charset} statements at its start
+	 *         that {@code input} doesn't start with
+	 */
+	private static String withoutIgnoredCharset(String output, String input) {
+		Matcher m = HONOURED_CHARSET.matcher(output);
+		while (m.lookingAt() && !input.startsWith(m.group())) {
+			output = output.substring(m.end());
+			m = HONOURED_CHARSET.matcher(output);
+		}
+		return output;
 	}
 
 	/**
