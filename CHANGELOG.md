@@ -3,6 +3,48 @@
 The format here is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0] - 2026-10-25
+This release changes the API, so code written for 1.x needs updating.
+With streams, `new CSSMinifier(reader).minify(writer)` becomes
+`new CSSMinifier().minify(reader, writer)`, and the same goes for
+`JSMinifier`, but the new method closes neither stream.
+
+### Added
+- Added an `Automatic-Module-Name` to the jar's manifest, so on the
+  module path, its module is `net.logicsquad.minifier`, rather than a
+  name derived from the jar's file name. #51
+
+### Changed
+- Replaced the `Reader`/`Writer` API with
+  `String minify(String source)`. `CSSMinifier` and `JSMinifier` have
+  no-argument constructors and keep no state between calls, so one
+  instance can minify any number of resources, from any number of
+  threads. For streams, `Minifier` has a default
+  `minify(Reader, Writer)`, which writes nothing unless minification
+  succeeds. #32
+- `MinificationException` now says what went wrong, and where, as in
+  `Unterminated comment at line 12, column 5`, and `line()` and
+  `column()` return the position. It no longer wraps an `IOException`,
+  or one of the minifiers' own exceptions, which have gone. #33
+- Removed the line break at the start of `JSMinifier`'s output, and
+  the `\r\n` at the end of `CSSMinifier`'s. #34
+- Made `CSSMinifier` and `JSMinifier` final. #48
+- Both minifiers now keep comments that start with `/*!`, which mark a
+  licence or copyright notice, and remove all others, including the
+  `/**` comments that `CSSMinifier` used to keep. #50
+
+### Removed
+- Removed `AbstractMinifier`, and the minifiers' constructors that take
+  a `Reader`. #32
+- Removed `CSSMinifier`'s debug logging, and with it the dependency on
+  `slf4j-api`, so minifier has no runtime dependencies. #49
+
+### Fixed
+- Fixed a failed minification leaving partial output behind, and
+  `CSSMinifier` ignoring errors writing its output. #32
+- Fixed `CSSMinifier` dropping a kept comment after a rule's last
+  declaration, or in an otherwise empty rule. #50
+
 ## [1.7] - 2026-10-25
 ### Fixed
 - Fixed JavaScript operators running together, which could change
