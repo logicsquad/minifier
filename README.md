@@ -59,7 +59,7 @@ dependency:
     <dependency>
       <groupId>net.logicsquad</groupId>
       <artifactId>minifier</artifactId>
-      <version>1.7</version>
+      <version>2.0</version>
     </dependency>
 
 On the module path, its module is `net.logicsquad.minifier`.
