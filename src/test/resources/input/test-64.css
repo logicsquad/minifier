@@ -1,0 +1,14 @@
+/*! Licence: kept */
+/** Documentation: removed */
+/* Plain: removed */
+a /*! Kept in a selector */ b {
+    /** Removed */
+    color: red;
+    /*! Kept after the last declaration */
+}
+.empty {
+    /** Removed, and so is the rule */
+}
+.licensed {
+    /*! Kept in a rule with nothing else in it */
+}

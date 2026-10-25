@@ -1,5 +1,5 @@
 @import url("reset.css");
-/** Empty layer blocks fix the layer order: base, then theme. */
+/*! Empty layer blocks fix the layer order: base, then theme. */
 @layer base {}
 @layer theme { a { color: red } }
 @layer base { a { color: blue } }

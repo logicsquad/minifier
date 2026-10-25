@@ -1,6 +1,6 @@
 @import url("theme.css");
 .unused {}
-/** Kept, although the rule after it is empty. */
+/*! Kept, although the rule after it is empty. */
 .empty {}
 @layer base, theme;
 .also-empty {}

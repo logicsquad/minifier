@@ -1,4 +1,4 @@
-![](https://github.com/logicsquad/minifier/workflows/build/badge.svg)
+[![Build](https://github.com/logicsquad/minifier/actions/workflows/build.yml/badge.svg)](https://github.com/logicsquad/minifier/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/License-BSD-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
 Minifier
@@ -11,36 +11,45 @@ web resources. The key word is "safely": the aim is _not_ to produce
 maximal size reduction, nor introduce any morphological changes, but
 to provide _reasonable_ file size reduction in most cases.
 
-At launch, we will provide classes to minify Javascript and CSS.
-
 Getting started
 ---------------
 There are two minifier classes:
 
 * `CSSMinifier` for CSS; and
-* `JSMinifier` for Javascript.
+* `JSMinifier` for JavaScript.
 
-They both implement `Minifier`, which declares a single method:
+They both implement `Minifier`, which takes the text of a resource and
+returns it minified:
 
-    void minify(Writer writer) throws MinificationException;
+    String minify(String source) throws MinificationException;
 
-Further, they both extend `AbstractMinifier`, which provides a
-constructor taking a `Reader` object. So you need a `Reader` and a
-`Writer` to minify a resource, and that's it. For example:
+A minifier keeps no state between calls, so a single instance can
+minify any number of resources, from any number of threads. For
+example, to minify a stylesheet in `css`:
 
-    Reader input = new FileReader("basic.css");
-    Writer output = new FileWriter("basic-min.css");
-    Minifier min = new CSSMinifier(input);
+    Minifier minifier = new CSSMinifier();
     try {
-        min.minify(output);
+        String minified = minifier.minify(css);
     } catch (MinificationException e) {
         // Handle exception
     }
 
-And that's it. A `MinificationException` will usually wrap some _other_
-exception, such as `CSSMinifier.UnterminatedCommentException`. If you
-need to know why minification failed, you can call `getCause()` on the
-exception you catch.
+If you have a `Reader` and a `Writer`, `Minifier` also has a default
+method that reads the whole resource from one, and writes it, minified,
+to the other:
+
+    void minify(Reader reader, Writer writer) throws IOException, MinificationException;
+
+It writes nothing unless minification succeeds, and it doesn't close
+either stream: that's up to you.
+
+A `MinificationException` says what went wrong, and where: its message
+is something like `Unterminated comment at line 12, column 5`, and
+`line()` and `column()` return the position, both numbered from 1.
+
+Comments are removed, apart from those that start with `/*!`, which
+mark a licence or copyright notice by convention: those are kept, where
+they are.
 
 Using Minifier
 --------------
@@ -50,8 +59,10 @@ dependency:
     <dependency>
       <groupId>net.logicsquad</groupId>
       <artifactId>minifier</artifactId>
-      <version>1.7</version>
+      <version>2.0</version>
     </dependency>
+
+On the module path, its module is `net.logicsquad.minifier`.
 
 If you're building a Maven project, and just want to minify project
 resources during the build, check out [Minifier Maven Plugin](https://github.com/logicsquad/minifier-maven-plugin),
@@ -64,7 +75,7 @@ to contribute.
 
 References
 ----------
-Javascript minification is based on Douglas Crockford's [original
+JavaScript minification is based on Douglas Crockford's [original
 C-based JSMin](https://github.com/douglascrockford/JSMin), via a
 [translation from C to
 Java](https://github.com/galan/packtag/blob/master/packtag-core/src/main/java/net/sf/packtag/implementation/JSMin.java)
